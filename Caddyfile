@@ -1,0 +1,32 @@
+# Lateral web server (used by docker-compose.yml). Serves the single-page app and forwards API calls.
+:8080 {
+	# Lateral's API (search, settings, relevance + image pipelines, LLM passthrough). The /api/lateral prefix is stripped.
+	handle_path /api/lateral/* {
+		reverse_proxy lateral-proxy:3005 {
+			transport http {
+				response_header_timeout 90s
+			}
+		}
+	}
+
+	# Predictions API is called at the site root.
+	handle /v2/* {
+		reverse_proxy lateral-proxy:3005 {
+			transport http {
+				response_header_timeout 90s
+			}
+		}
+	}
+
+	# Ollama on the host, same-origin so the browser needs no CORS setup.
+	handle_path /ollama/* {
+		reverse_proxy host.docker.internal:11434
+	}
+
+	# The app itself.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

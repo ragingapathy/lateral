@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Lateral",
+  "version": "0.1.0",
+  "homepage_url": "https://github.com/ragingapathy/lateral",
+  "description": "Clip any article to Lateral — create a tracked story or add an episode without leaving the page.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lateral",
+    "default_icon": {
+      "16":  "icon-16.png",
+      "48":  "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16":  "icon-16.png",
+    "48":  "icon-48.png",
+    "128": "icon-128.png"
+  }
+}

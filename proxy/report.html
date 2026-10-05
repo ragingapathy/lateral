@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lateral v2 — Prediction Report</title>
+<style>
+  :root {
+    --paper: #CBDCCB;
+    --sheet: #F5F9F5;
+    --ink: #1E2A22;
+    --muted: #5C6E5F;
+    --rule: #A9BFAC;
+    --tint: #E3EDE3;
+    --sage: #B2D4B6;
+    --support: #2d6a4f;
+    --contradict: #9b2226;
+    --complicate: #b69121;
+    --irrelevant: #6c757d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Georgia', serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  header {
+    text-align: center;
+    padding: 2rem 0;
+    border-bottom: 2px solid var(--rule);
+    margin-bottom: 2rem;
+  }
+  h1 { font-size: 2.5rem; font-weight: 400; letter-spacing: -0.02em; }
+  .subtitle { color: var(--muted); font-style: italic; margin-top: 0.5rem; }
+  .prediction-card {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(30,42,34,0.08);
+  }
+  .prediction-statement {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+  }
+  .meta {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .confidence-bar {
+    margin-top: 1rem;
+    height: 8px;
+    background: var(--tint);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--sage), var(--support));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .signals {
+    margin: 2rem 0;
+  }
+  .signal-tag {
+    display: inline-block;
+    background: var(--tint);
+    border: 1px solid var(--rule);
+    border-radius: 20px;
+    padding: 0.3rem 1rem;
+    margin: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .signal-tag.milestone { border-color: var(--support); color: var(--support); }
+  .signal-tag.warning { border-color: var(--contradict); color: var(--contradict); }
+  .signal-tag.indicator { border-color: var(--complicate); color: var(--complicate); }
+  .evidence-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  .evidence-item {
+    background: var(--sheet);
+    border-left: 4px solid var(--rule);
+    border-radius: 0 8px 8px 0;
+    padding: 1.25rem;
+    box-shadow: 0 1px 4px rgba(30,42,34,0.06);
+    transition: transform 0.15s ease;
+  }
+  .evidence-item:hover { transform: translateX(4px); }
+  .evidence-item.supports { border-left-color: var(--support); }
+  .evidence-item.contradicts { border-left-color: var(--contradict); }
+  .evidence-item.complicates { border-left-color: var(--complicate); }
+  .evidence-item.irrelevant { border-left-color: var(--irrelevant); }
+  .evidence-item.pending { border-left-color: var(--rule); }
+
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .item-title {
+    font-weight: 600;
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+  .item-title a { color: var(--ink); text-decoration: none; }
+  .item-title a:hover { text-decoration: underline; }
+  .stance-badge {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .stance-badge.supports { background: #d8f3dc; color: var(--support); }
+  .stance-badge.contradicts { background: #ffccd5; color: var(--contradict); }
+  .stance-badge.complicates { background: #fff3cd; color: var(--complicate); }
+  .stance-badge.irrelevant { background: #e9ecef; color: var(--irrelevant); }
+  .stance-badge.pending { background: var(--tint); color: var(--muted); }
+
+  .item-meta {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .item-summary {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .item-reason {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--muted);
+  }
+  .weight-bar {
+    margin-top: 0.75rem;
+    height: 4px;
+    background: var(--tint);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .weight-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  .stat-box {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Lateral</h1>
+    <p class="subtitle">Prediction Intelligence Report</p>
+  </header>
+
+  <div id="content">
+    <div class="empty-state">Loading prediction data...</div>
+  </div>
+</div>
+
+<script>
+const PROXY_URL = window.location.origin.includes('3005') ? '' : 'http://localhost:3005';
+
+function stanceColor(stance) {
+  const colors = {
+    supports: '#2d6a4f',
+    contradicts: '#9b2226',
+    complicates: '#b69121',
+    irrelevant: '#6c757d',
+    pending: '#A9BFAC'
+  };
+  return colors[stance] || colors.pending;
+}
+
+async function loadPrediction(id) {
+  const [predRes, linksRes] = await Promise.all([
+    fetch(`${PROXY_URL}/v2/predictions/${id}`),
+    fetch(`${PROXY_URL}/v2/links?predictionId=${id}`)
+  ]);
+  const predData = await predRes.json();
+  const linksData = await linksRes.json();
+  return { prediction: predData.prediction, items: predData.items, links: linksData.links };
+}
+
+function renderPrediction(prediction, links) {
+  const supports = links.filter(l => l.stance === 'supports').length;
+  const contradicts = links.filter(l => l.stance === 'contradicts').length;
+  const complicates = links.filter(l => l.stance === 'complicates').length;
+  const pending = links.filter(l => l.stance === 'pending').length;
+
+  const signalsHtml = prediction.signals.map(s =>
+    `<span class="signal-tag ${s.type}">${s.query}</span>`
+  ).join('');
+
+  const evidenceHtml = links.length ? links.map(l => `
+    <div class="evidence-item ${l.stance}">
+      <div class="item-header">
+        <div class="item-title"><a href="${l.item.url}" target="_blank">${l.item.title}</a></div>
+        <span class="stance-badge ${l.stance}">${l.stance}</span>
+      </div>
+      <div class="item-meta">${l.item.source} · ${new Date(l.item.publishedAt).toLocaleDateString()}</div>
+      <div class="item-summary">${l.item.summary || ''}</div>
+      ${l.reason ? `<div class="item-reason">"${l.reason}"</div>` : ''}
+      <div class="weight-bar">
+        <div class="weight-fill" style="width: ${l.weight}%; background: ${stanceColor(l.stance)}"></div>
+      </div>
+    </div>
+  `).join('') : '<div class="empty-state">No evidence items yet. Run a search to fetch stories.</div>';
+
+  return `
+    <div class="prediction-card">
+      <div class="prediction-statement">${prediction.statement}</div>
+      <div class="meta">
+        <span>Confidence: ${prediction.confidence}%</span>
+        <span>Status: ${prediction.status}</span>
+        <span>Signals: ${prediction.signals.length}</span>
+      </div>
+      <div class="confidence-bar">
+        <div class="confidence-fill" style="width: ${prediction.confidence}%"></div>
+      </div>
+      <div class="signals">${signalsHtml}</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-value" style="color: var(--support)">${supports}</div>
+        <div class="stat-label">Supports</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" style="color: var(--contradict)">${contradicts}</div>
+        <div class="stat-label">Contradicts</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" style="color: var(--complicate)">${complicates}</div>
+        <div class="stat-label">Complicates</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${pending}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${links.length}</div>
+        <div class="stat-label">Total</div>
+      </div>
+    </div>
+
+    <h2 style="margin-bottom: 1rem; font-weight: 400;">Evidence</h2>
+    <div class="evidence-grid">
+      ${evidenceHtml}
+    </div>
+  `;
+}
+
+async function init() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const predictionId = urlParams.get('id') || '17fb9c77-4269-46ca-97af-63d654717b28';
+
+  try {
+    const { prediction, links } = await loadPrediction(predictionId);
+    document.getElementById('content').innerHTML = renderPrediction(prediction, links);
+  } catch (e) {
+    document.getElementById('content').innerHTML = `
+      <div class="empty-state">Error loading prediction: ${e.message}</div>
+    `;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

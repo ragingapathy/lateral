@@ -1,0 +1,16 @@
+# SearXNG settings for Lateral. Starts from SearXNG's defaults and changes only what Lateral needs.
+use_default_settings: true
+
+general:
+  instance_name: "lateral-searxng"
+
+server:
+  # Change this to any random string. (SearXNG will not start with the placeholder in some versions.)
+  secret_key: "change-me-to-a-random-string"
+  limiter: false          # this instance is private to the Lateral proxy
+  image_proxy: false
+
+search:
+  formats:                # Lateral reads results as JSON
+    - html
+    - json

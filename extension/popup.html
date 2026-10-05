@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lateral</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- ── Loading ─────────────────────────────────────────────── -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <span>Connecting to Lateral…</span>
+  </div>
+
+  <!-- ── Error (server unreachable) ─────────────────────────── -->
+  <div id="error-screen" class="hidden">
+    <div class="error-icon">⚠</div>
+    <div id="error-msg">Could not reach Lateral</div>
+    <div class="error-sub">Check your server URL in settings.</div>
+    <button id="error-settings-btn" class="btn-primary" style="margin-top:14px">Open Settings</button>
+  </div>
+
+  <!-- ── Main UI ─────────────────────────────────────────────── -->
+  <div id="main" class="hidden">
+
+    <div class="header">
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect width="20" height="20" rx="5" fill="#4338ca"/>
+          <path d="M5 4h3.2v9.6H15V16H5V4z" fill="white"/>
+        </svg>
+        <span class="logo-text">LATERAL</span>
+      </div>
+      <button id="settings-btn" class="icon-btn" title="Settings">
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+
+    <div id="inline-status" class="inline-status hidden"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-mode="story">New Story</button>
+      <button class="tab" data-mode="episode">Add Episode</button>
+    </div>
+
+    <!-- ── New Story panel ──────────────────────────────────── -->
+    <div class="panel" data-mode="story">
+      <div class="field">
+        <label>Title</label>
+        <input id="ns-title" type="text" placeholder="Story title…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Summary <span class="opt">optional</span></label>
+        <textarea id="ns-summary" rows="2" placeholder="What's the underlying narrative being tracked?"></textarea>
+      </div>
+      <div class="field row2">
+        <div>
+          <label>Tags <span class="opt">comma-sep</span></label>
+          <input id="ns-tags" type="text" placeholder="trade, policy…" autocomplete="off">
+        </div>
+        <div>
+          <label>Key Actors <span class="opt">comma-sep</span></label>
+          <input id="ns-actors" type="text" placeholder="Acme Corp, City Council…" autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label>Source URL <span class="opt">first episode</span></label>
+        <input id="ns-url" type="text" class="url-input" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- ── Add Episode panel ────────────────────────────────── -->
+    <div class="panel hidden" data-mode="episode">
+      <div id="no-stories-msg" class="empty-msg hidden">
+        No stories tracked yet — add a story first.
+      </div>
+      <div id="episode-form">
+        <div class="field">
+          <label>Story</label>
+          <select id="ep-story"></select>
+        </div>
+        <div class="field">
+          <label>Headline</label>
+          <input id="ep-headline" type="text" placeholder="What happened?" autocomplete="off">
+        </div>
+        <div class="field row2">
+          <div>
+            <label>Date</label>
+            <input id="ep-date" type="date">
+          </div>
+          <div>
+            <label>Type</label>
+            <select id="ep-type">
+              <option value="development">Development</option>
+              <option value="seed">Seed</option>
+              <option value="contradiction">Contradiction</option>
+              <option value="confirmation">Confirmation</option>
+              <option value="escalation">Escalation</option>
+              <option value="burial">Burial</option>
+              <option value="silence_noted">Silence Noted</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Summary <span class="opt">optional</span></label>
+          <textarea id="ep-summary" rows="2" placeholder="Key details…"></textarea>
+        </div>
+        <div class="field">
+          <label>Framing Note <span class="opt">optional</span></label>
+          <input id="ep-framing" type="text" placeholder="How is this being spun?" autocomplete="off">
+        </div>
+        <div class="field row2">
+          <div>
+            <label>Tags <span class="opt">comma-sep</span></label>
+            <input id="ep-tags" type="text" placeholder="trade, policy…" autocomplete="off">
+          </div>
+          <div>
+            <label>Players <span class="opt">comma-sep</span></label>
+            <input id="ep-actors" type="text" placeholder="Acme Corp, City Council…" autocomplete="off">
+          </div>
+        </div>
+        <div class="field">
+          <label>Source URL</label>
+          <input id="ep-url" type="text" class="url-input" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="analyze-btn" class="btn-secondary">✦ Analyze page</button>
+      <button id="submit-btn" class="btn-primary">Add Story</button>
+    </div>
+  </div>
+
+  <!-- ── Success ─────────────────────────────────────────────── -->
+  <div id="success" class="hidden success-screen">
+    <div class="success-icon">✓</div>
+    <div id="success-msg">Saved!</div>
+    <div class="success-sub">Closing…</div>
+  </div>
+
+  <!-- ── Settings ────────────────────────────────────────────── -->
+  <div id="settings-panel" class="hidden">
+    <div class="header">
+      <button id="settings-back" class="icon-btn" title="Back">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+        </svg>
+      </button>
+      <span class="settings-title">Settings</span>
+    </div>
+    <div class="settings-body">
+      <div class="field">
+        <label>Lateral URL</label>
+        <input id="settings-url" type="text" placeholder="http://localhost:8080" autocomplete="off">
+        <div class="field-hint">Base URL of your Lateral instance. No trailing slash.</div>
+      </div>
+      <div class="field">
+        <label>AI Model</label>
+        <input id="settings-model" type="text" placeholder="qwen3:latest" autocomplete="off">
+        <div class="field-hint">Ollama model for ✦ Analyze page. Must be installed locally.</div>
+      </div>
+      <div id="settings-status" class="inline-status hidden" style="margin-bottom:10px"></div>
+      <button id="settings-save" class="btn-primary">Save</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

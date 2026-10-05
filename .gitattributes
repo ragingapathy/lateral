@@ -1,0 +1,6 @@
+# Store and check out text files with LF line endings on every platform
+# (CRLF in a Caddyfile, compose file, or script breaks Linux and macOS users).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

@@ -1,0 +1,279 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 380px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  background: #0d1117;
+  color: #e2e8f0;
+  min-height: 80px;
+}
+
+.hidden { display: none !important; }
+
+/* ── Loading ──────────────────────────────────────────── */
+#loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 36px 20px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.spinner {
+  width: 15px; height: 15px;
+  border: 2px solid #1e2d40;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Error screen ─────────────────────────────────────── */
+#error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 36px 24px 28px;
+  text-align: center;
+  gap: 6px;
+}
+.error-icon { font-size: 28px; color: #f87171; margin-bottom: 4px; }
+#error-msg  { font-size: 14px; font-weight: 600; }
+.error-sub  { font-size: 12px; color: #475569; }
+
+/* ── Header ───────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 13px 10px;
+  border-bottom: 1px solid #1a2133;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #64748b;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #334155;
+  padding: 4px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.icon-btn:hover { color: #94a3b8; background: #1a2133; }
+
+/* ── Inline status bar ────────────────────────────────── */
+.inline-status {
+  padding: 7px 13px;
+  font-size: 11.5px;
+  border-bottom: 1px solid #1a2133;
+}
+.inline-status.error   { color: #f87171; background: #1c0f0f; }
+.inline-status.info    { color: #818cf8; background: #10111f; }
+.inline-status.success { color: #4ade80; background: #0a1510; }
+.inline-status.warn    { color: #fbbf24; background: #131008; }
+
+/* ── Tabs ─────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  padding: 10px 13px 0;
+  gap: 2px;
+  border-bottom: 1px solid #1a2133;
+}
+.tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+  border-radius: 5px 5px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover  { color: #64748b; }
+.tab.active { color: #818cf8; border-bottom-color: #4f46e5; }
+
+/* ── Panels ───────────────────────────────────────────── */
+.panel { padding: 12px 13px 0; }
+
+/* ── Fields ───────────────────────────────────────────── */
+.field { margin-bottom: 10px; }
+
+.field label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+.field .opt {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #2d3f55;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  background: #131929;
+  border: 1px solid #1e2d40;
+  border-radius: 6px;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: #3730a3;
+  background: #141c2e;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 50px;
+  line-height: 1.5;
+}
+.field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23475569' d='M5 7L0.5 2.5h9z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 26px;
+  cursor: pointer;
+}
+.field select option { background: #131929; }
+
+/* URL field — monospace, smaller, muted */
+.url-input {
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace !important;
+  font-size: 11px !important;
+  color: #334155 !important;
+}
+.url-input:focus { color: #64748b !important; }
+
+.field-hint { font-size: 11px; color: #2d3f55; margin-top: 4px; }
+
+/* Two-column field row */
+.field.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.field.row2 .field { margin-bottom: 0; }
+
+/* Empty state */
+.empty-msg {
+  font-size: 12px;
+  color: #475569;
+  text-align: center;
+  padding: 20px 0 8px;
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+.footer {
+  padding: 11px 13px 13px;
+  border-top: 1px solid #1a2133;
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #1e2d40;
+  border-radius: 7px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-secondary:hover    { border-color: #4338ca; color: #818cf8; }
+.btn-secondary:active   { transform: translateY(1px); }
+.btn-secondary:disabled { color: #1e2d40; border-color: #131929; cursor: not-allowed; transform: none; }
+
+.btn-primary {
+  flex: 1;
+  min-width: 0;
+  background: #3730a3;
+  border: 1px solid #4338ca;
+  border-radius: 7px;
+  color: #e0e7ff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.08s;
+}
+.btn-primary:hover   { background: #4338ca; border-color: #6366f1; }
+.btn-primary:active  { transform: translateY(1px); }
+.btn-primary:disabled {
+  background: #1a2133;
+  border-color: #1a2133;
+  color: #334155;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Success screen ───────────────────────────────────── */
+.success-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 44px 20px;
+  gap: 8px;
+  text-align: center;
+}
+.success-icon {
+  width: 48px; height: 48px;
+  background: #052e16;
+  border: 1px solid #14532d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #4ade80;
+  margin-bottom: 4px;
+}
+#success-msg  { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+.success-sub  { font-size: 11px; color: #334155; }
+
+/* ── Settings panel ───────────────────────────────────── */
+.settings-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+.settings-body { padding: 14px 13px; }

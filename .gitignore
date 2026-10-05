@@ -1,0 +1,45 @@
+# ── Lateral ───────────────────────────────────────────────────────────────────
+
+# Secrets. API keys saved from Settings live in data/llm-secrets.json — never commit them.
+data/llm-secrets.json
+.env
+.env.*
+!.env.example
+*.key
+*_secrets.json
+!data/llm-secrets.example.json
+
+# User data & runtime state. Everything in data/ (stories, predictions, caches, logs, settings…) is created at runtime
+# and is personal to each install. Only the placeholder files below are tracked.
+data/*
+!data/.gitkeep
+!data/llm-secrets.example.json
+
+# Backups and archives made while developing
+*.bak
+*.bak-*
+*.bak.*
+*.zip
+lateral_original_backup/
+
+# Logs
+*.log
+
+# Local-only extension files (e.g. proxy/v2.local.js)
+proxy/*.local.js
+
+# Legacy native-Windows launchers (hard-coded local paths). The Docker container is the supported way to run the proxy.
+proxy/*.ps1
+__read.js
+
+# One-off debugging / experiment scripts (e.g. earlier Google News decoding attempts, Vane probes)
+proxy/debug_*.js
+proxy/check_cache*.js
+proxy/test_*.js
+
+# Dependencies, OS and editor files
+node_modules/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
