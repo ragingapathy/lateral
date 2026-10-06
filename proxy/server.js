@@ -307,7 +307,8 @@ async function handleSettingsPost(req, res) {
       const location = incoming?.location !== undefined ? String(incoming.location || '').trim() : String(existing.location || '').trim();
       const autoRefreshHoursRaw = incoming?.autoRefreshHours !== undefined ? incoming.autoRefreshHours : existing.autoRefreshHours;
       const autoRefreshHours = Number.isFinite(Number(autoRefreshHoursRaw)) ? Math.max(0, Number(autoRefreshHoursRaw)) : 8;
-      const payload = { location, autoRefreshHours, updatedAt: new Date().toISOString() };
+      const archiveAuto = incoming?.archiveAuto !== undefined ? incoming.archiveAuto !== false : existing.archiveAuto !== false;
+      const payload = { location, autoRefreshHours, archiveAuto, updatedAt: new Date().toISOString() };
       fs.writeFileSync(SETTINGS_FILE, JSON.stringify(payload), 'utf8');
       send(res, 200, { ok: true, ...payload });
     } catch (e) {
@@ -355,6 +356,9 @@ const v2 = require('./v2');
 const relevance = require('./relevance');
 const images = require('./images');
 const ops = require('./ops');
+const archive = require('./archive');
+const alerts = require('./alerts');
+const feeds = require('./feeds');
 
 // ─── HTTP request helper ─────────────────────────────────────────────────────────────────
 
@@ -4311,6 +4315,15 @@ const server = http.createServer(async (req, res) => {
   const isRestore = pathname === '/restore'      || pathname === '/api/lateral/restore';
   const isHealth  = pathname === '/health/check' || pathname === '/api/lateral/health/check';
   const opsCtx = { dataDir: DATA_DIR, send, getTavilyKey: () => resolveLlmSecrets().tavilyApiKey };
+  if (pathname.startsWith('/archive/') || pathname.startsWith('/api/lateral/archive/')) {
+    if (await archive.route(req, reqUrl, res, send) !== false) return;
+  }
+  if (/^(\/api\/lateral)?\/feeds?\//.test(pathname)) {
+    if (await feeds.route(req, reqUrl, res, send) !== false) return;
+  }
+  if (pathname.startsWith('/alerts/') || pathname.startsWith('/api/lateral/alerts/')) {
+    if (await alerts.route(req, reqUrl, res, send) !== false) return;
+  }
   if (isBackup  && req.method === 'GET')  return ops.handleBackup(res, opsCtx);
   if (isRestore && req.method === 'POST') return ops.handleRestore(req, res, opsCtx);
   if (isHealth  && req.method === 'GET')  return await ops.handleHealth(res, opsCtx);
@@ -4381,6 +4394,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => { console.log(`Lateral proxy ready on :${PORT}`); });
+alerts.init({ getTavilyKey: () => resolveLlmSecrets().tavilyApiKey, runChecks: () => ops.runChecks({ dataDir: DATA_DIR, getTavilyKey: () => resolveLlmSecrets().tavilyApiKey }) });
 
 // ── Auto-refresh scheduler ─────────────────────────────────────────────────────
 async function runAutoRefresh() {
@@ -4415,8 +4429,12 @@ async function runAutoRefresh() {
     try {
       const query = buildStoryWebDeltaQuery(story);
       // Broader time range for scheduler — not just today
-      const r = await fetchNewsFromSearx(query, { engines: NEWS_ENGINE_LIST, timeRange: 'week', timeout: 15000 });
-      const rawArticles = normalizeNewsResults(r.results || []).slice(0, 12);
+      // Feeds you attached to this story join the search results (and still count if the search engines are down).
+      const feedRes = feeds.hasFeeds(story.id) ? await feeds.itemsForStory(story.id) : { items: [] };
+      let r = { results: [] };
+      try { r = await fetchNewsFromSearx(query, { engines: NEWS_ENGINE_LIST, timeRange: 'week', timeout: 15000 }); }
+      catch (searchErr) { if (!feedRes.items.length) throw searchErr; }
+      const rawArticles = [...feedRes.items, ...normalizeNewsResults(r.results || []).slice(0, 12)];
       const articles = stampFirstSeenServer(rawArticles, prev);
       const newCount   = articles.length;
       const newDomains = articles.map(a => hostFromUrl(a.url || '')).filter(Boolean);
@@ -4469,6 +4487,7 @@ async function runAutoRefresh() {
     }
   }
   appendRefreshRun(run);
+  try { alerts.onRefreshRun(run); } catch (e) { console.warn('[Alerts] refresh hook:', e.message); }
   console.log(`[AutoRefresh] Done. Checked: ${checkedCount}/${active.length}, Growing: ${run.stories.filter(s=>s.coverage==='growing').length}, Silent: ${run.stories.filter(s=>s.coverage==='silent').length}, Skipped: ${run.stories.filter(s=>s.coverage==='skipped').length}`);
 }
 

@@ -110,7 +110,7 @@ function modelMatches(installed, wanted) {
   return installed.some(m => { const n = String(m).toLowerCase(); return n === w || n === wBase || n.split(':')[0] === w.split(':')[0] && !w.includes(':'); });
 }
 
-async function handleHealth(res, { dataDir, send, getTavilyKey }) {
+async function runChecks({ dataDir, getTavilyKey }) {
   const checks = [];
   const add = (id, label, status, detail, fix) => checks.push({ id, label, status, detail, fix: fix || '' });
 
@@ -129,6 +129,7 @@ async function handleHealth(res, { dataDir, send, getTavilyKey }) {
       [process.env.LATERAL_RELEVANCE_MODEL || 'qwen3:latest', 'the relevance filter', 'fail'],
       [process.env.LATERAL_IMAGE_JUDGE_MODEL || 'qwen3:latest', 'the image-fit judge', 'warn'],
       [process.env.LATERAL_VISION_MODEL || 'moondream:latest', 'the image judge (describes pictures)', 'warn'],
+      [process.env.LATERAL_EMBED_MODEL || 'nomic-embed-text', 'finding articles that report the same story (optional; grouping still works by headline wording without it)', 'warn'],
     ];
     const seen = new Set();
     for (const [model, why, level] of needed) {
@@ -172,7 +173,11 @@ async function handleHealth(res, { dataDir, send, getTavilyKey }) {
 
   const rank = { ok: 0, warn: 1, fail: 2 };
   const worst = checks.reduce((m, c) => Math.max(m, rank[c.status]), 0);
-  send(res, 200, { overall: ['ok', 'warn', 'fail'][worst], checkedAt: new Date().toISOString(), checks });
+  return { overall: ['ok', 'warn', 'fail'][worst], checkedAt: new Date().toISOString(), checks };
 }
 
-module.exports = { handleBackup, handleRestore, handleHealth, BACKUP_FILES };
+async function handleHealth(res, ctx) {
+  ctx.send(res, 200, await runChecks(ctx));
+}
+
+module.exports = { handleBackup, handleRestore, handleHealth, runChecks, BACKUP_FILES };

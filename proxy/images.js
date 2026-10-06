@@ -431,6 +431,25 @@ async function tavilyExtractImages(pageUrl) {
   } catch { return []; }
 }
 
+// Readable article text from Tavily Extract, for pages that refuse a direct fetch. Shares the daily Extract budget above.
+async function tavilyExtractText(pageUrl) {
+  const key = getTavilyKey();
+  if (!key) return null;
+  rollDay();
+  if (stats.tavily.extractCallsToday >= TAVILY_EXTRACT_PER_DAY) { stats.tavily.skippedBudget++; return null; }
+  stats.tavily.extractCallsToday++; stats.tavily.extractCallsTotal++; stats.tavily.estCreditsTotal = Math.round((stats.tavily.estCreditsTotal + 0.2) * 100) / 100;
+  try {
+    const r = await fetch('https://api.tavily.com/extract', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ urls: [pageUrl], extract_depth: 'basic', format: 'text' }), signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) return null;
+    const first = ((await r.json()).results || [])[0] || {};
+    const text = String(first.raw_content || '').trim();
+    return text ? { text, image: (first.images || [])[0] || '' } : null;
+  } catch { return null; }
+}
+
 // ─── Step 4: image search by headline (last resort; always vision-judged) ────
 
 async function searchImageCandidates(article, domain) {
@@ -568,4 +587,4 @@ function getStats() {
   return { ...stats, cacheEntries: Object.keys(c.entries).length, googleLinksResolved: Object.values(c.gn).filter(x => x.real).length, tavilyDailyBudget: TAVILY_EXTRACT_PER_DAY };
 }
 
-module.exports = { resolveBatch, resolveOne, getStats, isGoogleWrapper, resolveGoogleNews };
+module.exports = { resolveBatch, resolveOne, getStats, isGoogleWrapper, resolveGoogleNews, tavilyExtractText };

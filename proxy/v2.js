@@ -222,10 +222,31 @@ Respond ONLY with JSON: {"signals":[{"query":"...","type":"indicator|actor|event
 
 // Roll scored links up into a closer/further reading.
 // score: -100 (evidence says it won't happen) .. +100 (evidence says it will). Mixed/complicating items add no direction.
-function computeEvidence(links) {
-  const c = { supports: 0, contradicts: 0, complicates: 0, irrelevant: 0, pending: 0, error: 0 };
-  let sup = 0, con = 0;
+//
+// `groups` (from the same-story grouping) maps itemId -> its group of articles reporting one event. Only the strongest article
+// of each group counts (a manual review wins); the others are echoes, listed but not counted, so one wire story carried by
+// five outlets is one piece of evidence, not five.
+const DIRECTIONAL = ['supports', 'contradicts', 'complicates'];
+function pickReps(links, groups) {
+  const best = new Map(); // gid -> { id, score }
+  if (!groups) return best;
   for (const l of links) {
+    const g = groups.get(l.itemId);
+    if (!g || l.countSeparately) continue;
+    const conf = l.tagger === 'user' || !(l.confidence > 0) ? 1 : l.confidence;
+    const score = (l.tagger === 'user' ? 1000 : 0) + (DIRECTIONAL.includes(l.stance) ? (Number(l.weight) || 0) * conf + 1 : 0);
+    const cur = best.get(g.gid);
+    if (!cur || score > cur.score) best.set(g.gid, { id: l.id, score });
+  }
+  return best;
+}
+function computeEvidence(links, groups) {
+  const c = { supports: 0, contradicts: 0, complicates: 0, irrelevant: 0, pending: 0, error: 0 };
+  let sup = 0, con = 0, echoes = 0;
+  const reps = pickReps(links, groups);
+  for (const l of links) {
+    const g = groups && !l.countSeparately ? groups.get(l.itemId) : null;
+    if (g && reps.get(g.gid) && reps.get(g.gid).id !== l.id) { echoes++; continue; }
     c[l.stance] = (c[l.stance] || 0) + 1;
     const conf = l.tagger === 'user' || !(l.confidence > 0) ? 1 : l.confidence;
     const w = (Number(l.weight) || 0) * conf;
@@ -238,7 +259,7 @@ function computeEvidence(links) {
   const direction = total === 0 ? 'none' : score >= 15 ? 'closer' : score <= -15 ? 'further' : 'mixed';
   const directional = c.supports + c.contradicts;
   const strength = directional === 0 ? 'none' : directional < 3 ? 'thin' : directional < 8 ? 'moderate' : 'solid';
-  return { score, direction, strength, ...c, total: links.length, scored: c.supports + c.contradicts + c.complicates + c.irrelevant };
+  return { score, direction, strength, ...c, total: links.length, echoes, events: links.length - echoes, scored: c.supports + c.contradicts + c.complicates + c.irrelevant };
 }
 
 // ─── Background search + score jobs (one per prediction) ──────────────────────────
@@ -271,6 +292,10 @@ async function scoreAndStoreLink(job, linkId, activeSignals) {
   writeV2(v2);
   if (sc.stance === 'error') job.errors.push(`${String(item.title || item.url).slice(0, 60)}: ${sc.reason}`);
   else job.scored++;
+  // Keep a saved copy of anything that actually bears on the prediction (not the irrelevant results).
+  if (['supports', 'contradicts', 'complicates'].includes(sc.stance)) {
+    try { require('./archive').enqueueAuto([{ url: item.url, title: item.title, predictionId: link.predictionId }]); } catch { /* archive is optional */ }
+  }
 }
 
 async function runSearchJob(job) {
@@ -323,6 +348,44 @@ async function runSearchJob(job) {
   }
 }
 
+// ─── Same-story grouping ──────────────────────────────────────────────────────────
+const dedupe = require('./dedupe');
+const _grouping = new Map(); // predictionId -> { state, startedAt, finishedAt, stats }
+
+function entriesFor(v, predId) {
+  const seen = new Set();
+  const out = [];
+  for (const l of v.links) {
+    if (l.predictionId !== predId || seen.has(l.itemId)) continue;
+    seen.add(l.itemId);
+    const item = v.items.find(i => i.id === l.itemId);
+    if (!item) continue;
+    let host = ''; try { host = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
+    out.push({ id: item.id, title: item.title, text: item.summary, source: item.source || host });
+  }
+  return out;
+}
+function groupsFor(v, predId) {
+  const links = v.links.filter(l => l.predictionId === predId);
+  return dedupe.clustersFor(links.map(l => l.itemId), new Set(links.filter(l => l.countSeparately).map(l => l.itemId)));
+}
+// Judges any article pairs not yet judged (slow, so always run in the background).
+function startGrouping(predId) {
+  const cur = _grouping.get(predId);
+  if (cur && cur.state === 'running') return cur;
+  const st = { state: 'running', startedAt: nowIso(), stats: null };
+  _grouping.set(predId, st);
+  dedupe.groupEntries(entriesFor(readV2(), predId))
+    .then(stats => { st.stats = stats; st.state = 'done'; })
+    .catch(e => { st.state = 'error'; st.error = e.message; })
+    .finally(() => {
+      st.finishedAt = nowIso();
+      try { require('./alerts').checkPrediction(predId); } catch { /* alerts are optional */ }
+    });
+  return st;
+}
+function groupingState(predId) { const g = _grouping.get(predId); return g ? { state: g.state, error: g.error || null } : { state: 'idle' }; }
+
 // ─── Route Handlers ──────────────────────────────────────────────────────────────
 
 function handlePredictionsList(res) {
@@ -367,7 +430,7 @@ function handlePredictionGet(reqUrl, res) {
     const item = v2.items.find(i => i.id === l.itemId);
     return { ...item, link: l };
   });
-  send(res, 200, { prediction: p, items, evidence: computeEvidence(links) });
+  send(res, 200, { prediction: p, items, evidence: computeEvidence(links, groupsFor(v2, id)), grouping: groupingState(id) });
 }
 
 // GET /v2/calibration — track record across resolved predictions.
@@ -418,7 +481,7 @@ function handlePredictionPatch(req, reqUrl, res) {
       // frozen alongside the outcome so calibration can later compare "which way the news leaned" to what happened.
       if (body.outcome !== undefined) {
         if (body.outcome === 'yes' || body.outcome === 'no') {
-          const ev = computeEvidence(v2.links.filter(l => l.predictionId === id));
+          const ev = computeEvidence(v2.links.filter(l => l.predictionId === id), groupsFor(v2, id));
           p.resolution = {
             outcome: body.outcome, resolvedAt: nowIso(),
             balance: ev.score, direction: ev.direction, strength: ev.strength,
@@ -453,15 +516,14 @@ function handlePredictionDelete(reqUrl, res) {
 }
 
 // POST /v2/predictions/:id/search — start a background search+score job (returns immediately)
-function handlePredictionSearch(req, reqUrl, res) {
-  const id = reqUrl.pathname.split('/').filter(Boolean)[2];
-  if (!id) return send(res, 400, { error: 'Missing prediction ID' });
+// Starts a background search-and-score run. Returns { job } (maybe alreadyRunning) or { error, status }.
+function startSearchJob(id) {
   const p = readV2().predictions.find(x => x.id === id);
-  if (!p) return send(res, 404, { error: 'Not found' });
+  if (!p) return { error: 'Not found', status: 404 };
   const existing = _jobs.get(id);
-  if (existing && existing.state === 'running') return send(res, 202, { job: publicJob(existing), alreadyRunning: true });
-  if (!(p.signals || []).some(s => s.active && s.query)) return send(res, 400, { error: 'Add at least one active signal first.' });
-  if (!getTavilyKey()) return send(res, 503, { error: 'Tavily API key not configured — add it in Settings → Web search (the ⚙ icon).' });
+  if (existing && existing.state === 'running') return { job: publicJob(existing), alreadyRunning: true };
+  if (!(p.signals || []).some(s => s.active && s.query)) return { error: 'Add at least one active signal first.', status: 400 };
+  if (!getTavilyKey()) return { error: 'Tavily API key not configured — add it in Settings → Web search (the ⚙ icon).', status: 503 };
 
   const job = {
     id: uuid(), predictionId: id, state: 'running', phase: 'starting', startedAt: nowIso(),
@@ -471,8 +533,16 @@ function handlePredictionSearch(req, reqUrl, res) {
   runSearchJob(job)
     .then(() => { job.state = 'done'; job.phase = 'done'; job.message = `Found ${job.found} new article${job.found === 1 ? '' : 's'}, scored ${job.scored}.`; })
     .catch(e => { job.state = 'error'; job.phase = 'error'; job.message = e.message; })
-    .finally(() => { job.finishedAt = nowIso(); job.currentSignal = ''; });
-  send(res, 202, { job: publicJob(job) });
+    .finally(() => { job.finishedAt = nowIso(); job.currentSignal = ''; try { startGrouping(id); } catch { /* grouping is best-effort */ } });
+  return { job: publicJob(job) };
+}
+
+function handlePredictionSearch(req, reqUrl, res) {
+  const id = reqUrl.pathname.split('/').filter(Boolean)[2];
+  if (!id) return send(res, 400, { error: 'Missing prediction ID' });
+  const r = startSearchJob(id);
+  if (r.error) return send(res, r.status, { error: r.error });
+  send(res, 202, r.alreadyRunning ? { job: r.job, alreadyRunning: true } : { job: r.job });
 }
 
 // GET /v2/predictions/:id/search/status — latest job for this prediction (or null)
@@ -549,17 +619,48 @@ function handleItemsList(reqUrl, res) {
 }
 
 // GET /v2/links — list links, optionally filtered by prediction
+// POST /v2/links/:id/separate { separate: true|false } — count this article as its own piece of evidence even if it was
+// grouped with others (or put it back into its group).
+function handleLinkSeparate(req, reqUrl, res) {
+  const id = reqUrl.pathname.split('/').filter(Boolean)[2];
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      const v2 = readV2();
+      const l = v2.links.find(x => x.id === id);
+      if (!l) return send(res, 404, { error: 'Not found' });
+      if (body.separate === false) delete l.countSeparately; else l.countSeparately = true;
+      writeV2(v2);
+      send(res, 200, { ok: true, countSeparately: !!l.countSeparately });
+    } catch (e) { send(res, 400, { error: e.message }); }
+  });
+}
+
 function handleLinksList(reqUrl, res) {
   const predictionId = reqUrl.searchParams.get('predictionId');
   const v2 = readV2();
   let links = v2.links;
   if (predictionId) links = links.filter(l => l.predictionId === predictionId);
-  // Attach item data
+  // Attach item data, plus same-story group info when listing one prediction's links
+  const groups = predictionId ? groupsFor(v2, predictionId) : null;
+  const reps = groups ? pickReps(links, groups) : new Map();
   const withItems = links.map(l => {
     const item = v2.items.find(i => i.id === l.itemId);
-    return { ...l, item };
+    const g = groups && !l.countSeparately ? groups.get(l.itemId) : null;
+    let group = null;
+    if (g) {
+      const outlets = g.members.map(id => {
+        const it = v2.items.find(i => i.id === id);
+        if (!it) return '';
+        try { return it.source || new URL(it.url).hostname.replace(/^www\./, ''); } catch { return it.source || ''; }
+      }).filter(Boolean);
+      group = { id: g.gid, size: g.size, echo: !!reps.get(g.gid) && reps.get(g.gid).id !== l.id, outlets };
+    }
+    return { ...l, item, group };
   });
-  send(res, 200, { links: withItems });
+  send(res, 200, { links: withItems, grouping: predictionId ? groupingState(predictionId) : undefined });
 }
 
 // ─── Programmatic evidence API ───────────────────────────────────────────────────────────
@@ -648,6 +749,15 @@ function route(req, reqUrl, res, llmConfig) {
   if (pathname.endsWith('/review') && pathname.startsWith('/v2/links/') && req.method === 'POST') {
     return handleLinkReview(req, reqUrl, res);
   }
+  if (pathname.endsWith('/group') && pathname.startsWith('/v2/predictions/') && req.method === 'POST') {
+    const pid = pathname.split('/').filter(Boolean)[2];
+    if (!readV2().predictions.find(x => x.id === pid)) return send(res, 404, { error: 'Not found' });
+    startGrouping(pid);
+    return send(res, 202, { grouping: groupingState(pid) });
+  }
+  if (pathname.endsWith('/separate') && pathname.startsWith('/v2/links/') && req.method === 'POST') {
+    return handleLinkSeparate(req, reqUrl, res);
+  }
   if (pathname.endsWith('/score') && pathname.startsWith('/v2/links/') && req.method === 'POST') {
     return handleLinkScore(req, reqUrl, res, llmConfig);
   }
@@ -681,4 +791,16 @@ function route(req, reqUrl, res, llmConfig) {
   return false; // not handled
 }
 
-module.exports = { route, tavilySearch, scoreItemAgainstPrediction, suggestSignals, computeEvidence };
+// Current evidence for a prediction, as the alerts engine needs it.
+function evidenceSnapshot(predId) {
+  const v = readV2();
+  const prediction = v.predictions.find(x => x.id === predId);
+  if (!prediction) return null;
+  const links = v.links.filter(l => l.predictionId === predId);
+  const evidence = computeEvidence(links, groupsFor(v, predId));
+  const items = new Map(v.items.map(i => [i.id, i]));
+  return { prediction, evidence, links: links.map(l => ({ ...l, item: items.get(l.itemId) })) };
+}
+function listPredictions() { return readV2().predictions; }
+
+module.exports = { route, tavilySearch, scoreItemAgainstPrediction, suggestSignals, computeEvidence, startSearchJob, evidenceSnapshot, listPredictions, jobStatus: id => publicJob(_jobs.get(id)) };

@@ -49,6 +49,91 @@
       --accent: #2b6b4a;
       --accent-light: #cfe3d1;
     }
+    /* Golden-yellow accent: the masthead rule, focus rings, text selection and the active rail item. */
+    [data-theme="ledger"] { --gold: #d9a521; --gold-soft: #f3e2a9; }
+    [data-theme="ledger"] header { border-bottom: 3px solid var(--gold) !important; }
+    [data-theme="ledger"] input:focus, [data-theme="ledger"] textarea:focus, [data-theme="ledger"] select:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+    /* Active tab underline (every tab strip draws it as a 2px accent bottom border) and the active left-rail icon. */
+    [data-theme="ledger"] [style*="border-bottom: 2px solid var(--accent)"] { border-bottom-color: var(--gold) !important; }
+    [data-theme="ledger"] [style*="width: 36px"][style*="border: 1px solid var(--accent)"] { border-color: var(--gold) !important; background: var(--gold-soft) !important; box-shadow: 0 0 0 2px #d9a52144; }
+    [data-theme="ledger"] ::selection { background: var(--gold-soft); color: #1e2a22; }
+    /* Episode action buttons (Analyze / source + saved copy / delete) */
+    :root { --on-accent: #ffffff; }
+    [data-theme="midnight"] { --on-accent: #1a1033; }
+    .ep-primary {
+      display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+      padding: 10px 14px; border: none; border-radius: 10px; cursor: pointer;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 100%);
+      color: var(--on-accent); font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: 0.03em;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.22) inset, 0 8px 16px -8px var(--accent);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+    .ep-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); box-shadow: 0 1px 0 rgba(255,255,255,0.28) inset, 0 12px 20px -8px var(--accent); }
+    .ep-primary:active:not(:disabled) { transform: translateY(0); filter: brightness(0.98); }
+    .ep-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .ep-primary svg, .ep-cell svg, .ep-danger svg { flex-shrink: 0; }
+    .ep-seg { display: flex; width: 100%; margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+    .ep-seg > * + * { border-left: 1px solid var(--border); }
+    .ep-seg > span { display: flex; flex: 1; min-width: 0; }
+    .ep-cell {
+      display: flex; align-items: center; justify-content: center; gap: 7px; flex: 1; min-width: 0;
+      padding: 9px 10px; border: none; background: none; color: var(--accent); cursor: pointer;
+      font: inherit; font-size: 12px; font-weight: 700; text-decoration: none; transition: background 0.12s ease;
+    }
+    .ep-cell:hover:not(:disabled) { background: var(--accent-light); }
+    .ep-cell:disabled { opacity: 0.6; cursor: default; }
+    .ep-danger {
+      display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+      padding: 8px; border: none; border-radius: 8px; background: none; cursor: pointer;
+      color: #b91c1c; font: inherit; font-size: 11.5px; font-weight: 700; opacity: 0.7;
+      transition: background 0.12s ease, opacity 0.12s ease;
+    }
+    .ep-danger:hover { background: rgba(220,38,38,0.1); opacity: 1; }
+    [data-theme="midnight"] .ep-danger { color: #f87171; }
+
+    /* Top navigation buttons */
+    .tb-btn {
+      position: relative; display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+      padding: 6px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.01em; cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+    .tb-btn svg { color: var(--tb, var(--accent)); flex-shrink: 0; }
+    .tb-btn:hover { transform: translateY(-1px); border-color: var(--tb, var(--accent)); box-shadow: 0 8px 16px -10px var(--tb, var(--accent)); }
+    .tb-btn.gold { background: linear-gradient(180deg, #b45309 0%, #92400e 100%); border-color: #f59e0b; color: #fde68a; }
+    .tb-btn.gold svg { color: #fde68a; }
+    .tb-btn.gold:hover { filter: brightness(1.08); border-color: #fbbf24; box-shadow: 0 8px 16px -10px #f59e0b; }
+    .tb-btn.gold.busy { background: #78350f; border-color: #d97706; cursor: default; transform: none; }
+    .tb-btn.gold.busy svg { animation: spin 1s linear infinite; }
+    .tb-btn.gold.done { background: #166534; border-color: #22c55e; color: #dcfce7; }
+    .tb-icon {
+      display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex-shrink: 0;
+      border: none; border-radius: 10px; background: none; color: var(--text-mute); cursor: pointer; font-size: 16px;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .tb-icon:hover { background: var(--border-light); color: var(--text); }
+
+    /* Story header actions: one joined control for the tools, one primary button */
+    .hd-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .hd-seg > * + * { border-left: 1px solid var(--border); }
+    .hd-cell {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: none; background: none;
+      color: var(--text-mid); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .hd-cell svg { color: var(--accent); flex-shrink: 0; }
+    .hd-cell:hover:not(:disabled) { background: var(--accent-light); color: var(--accent); }
+    .hd-cell:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hd-primary {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border: none; border-radius: 10px; cursor: pointer;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff) 0%, var(--accent) 100%);
+      color: var(--on-accent); font: inherit; font-size: 12px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.22) inset, 0 8px 14px -8px var(--accent);
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .hd-primary:hover { transform: translateY(-1px); filter: brightness(1.07); }
+
     [data-theme="ledger"] body { font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
     /* Headings that use the serif display face pick up Libre Caslon in this theme. */
     [data-theme="ledger"] [style*="Playfair Display"] { font-family: 'Libre Caslon Text', Georgia, serif !important; }
@@ -3294,7 +3379,7 @@ function StoryCard({
   );
 }
 
-function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDeleteStory, onReorderStories, isOpen, onOpen, onClose, activeView, onViewChange }) {
+function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDeleteStory, onReorderStories, isOpen, onOpen, onClose, activeView, onViewChange, libraryNode }) {
   const [q,setQ]=useState('');
   const [sf,setSf]=useState('all');
   const [draggingStoryId, setDraggingStoryId] = useState(null);
@@ -3354,6 +3439,13 @@ function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDe
             <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
           </svg>
         </button>
+        <button onClick={()=>{onViewChange('library'); onOpen();}} title="Library: saved copies of articles"
+          style={{width:36,height:36,borderRadius:9,border:`1px solid ${activeView==='library'?C.accent:C.border}`,background:activeView==='library'?C.accent+'22':C.surface,color:activeView==='library'?C.accent:C.text,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 4.5h9.5a3 3 0 013 3V20H8a3 3 0 01-3-3V4.5z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+            <path d="M5 17a3 3 0 013-3h9.5" stroke="currentColor" strokeWidth="1.6"/>
+          </svg>
+        </button>
         <button onClick={onOpen} title="Open search"
           style={{width:36,height:36,borderRadius:9,border:`1px solid ${C.border}`,background:C.surface,color:C.text,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3364,6 +3456,24 @@ function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDe
       </div>
     );
   }
+  const tabStyle = on => ({padding:'4px 10px',borderRadius:6,border:'none',background:on?C.accent:C.border,color:on?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'});
+  if (activeView==='library') {
+    return (
+      <div style={{width:272,minWidth:272,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
+        <div style={{padding:'14px 14px 10px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{display:'flex',gap:4}}>
+              <button onClick={()=>onViewChange('stories')} style={tabStyle(false)}>Stories</button>
+              <button onClick={()=>onViewChange('predictions')} style={tabStyle(false)}>Predictions</button>
+              <button onClick={()=>onViewChange('library')} style={tabStyle(true)}>Library</button>
+            </div>
+            <button onClick={onClose} title="Collapse panel" style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>×</button>
+          </div>
+        </div>
+        {libraryNode}
+      </div>
+    );
+  }
   return (
     <div style={{width:272,minWidth:272,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
       <div style={{padding:'14px 14px 10px'}}>
@@ -3371,6 +3481,7 @@ function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDe
           <div style={{display:'flex',gap:4}}>
             <button onClick={()=>onViewChange('stories')} style={{padding:'4px 10px',borderRadius:6,border:'none',background:activeView==='stories'?C.accent:C.border,color:activeView==='stories'?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'}}>Stories</button>
             <button onClick={()=>onViewChange('predictions')} style={{padding:'4px 10px',borderRadius:6,border:'none',background:activeView==='predictions'?C.accent:C.border,color:activeView==='predictions'?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'}}>Predictions</button>
+            <button onClick={()=>onViewChange('library')} style={tabStyle(false)}>Library</button>
           </div>
           <button onClick={onClose} title="Collapse panel"
             style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>
@@ -3842,6 +3953,10 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
   const [addedSocialIdx, setAddedSocialIdx] = useState(null);
   const [filtered,   setFiltered]   = useState([]);   // articles the relevance judge removed
   const [rechecking, setRechecking] = useState(false);
+  const [showFeeds, setShowFeeds] = useState(false);
+  const [feedCount, setFeedCount] = useState(0);
+  const loadFeedCount = () => { if (story && story.id) feedsJson('subs?storyId=' + encodeURIComponent(story.id)).then(d => setFeedCount((d.subs || []).length)); };
+  useEffect(() => { loadFeedCount(); }, [story && story.id]);
   const forceRef = React.useRef(false);
 
   function handleRefresh() { forceRef.current = true; setTick(n => n + 1); }
@@ -4097,7 +4212,9 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
         {cacheLabel && <span style={{fontSize:9.5,color:C.textMute,fontStyle:'italic'}}>· {cacheLabel}</span>}
         <button onClick={recheckItems} disabled={rechecking} title="Have the AI re-read these headlines and move any that don't belong to the Filtered out list"
           style={{marginLeft:'auto',fontSize:11,color:C.textMute,background:'none',border:'none',cursor:rechecking?'default':'pointer',fontWeight:700,padding:0}}>{rechecking ? 'checking…' : '✓ Check relevance'}</button>
+        <button onClick={() => setShowFeeds(true)} title="Follow RSS or Atom feeds for this story" style={{fontSize:11,color:feedCount ? C.accent : C.textMute,background:'none',border:'none',cursor:'pointer',fontWeight:700,padding:0}}>⌁ Feeds{feedCount ? ` (${feedCount})` : ''}</button>
         <button onClick={handleRefresh} style={{fontSize:11,color:C.accent,background:'none',border:'none',cursor:'pointer',fontWeight:700,padding:0}}>↻ Refresh</button>
+        {showFeeds && <StoryFeedsModal story={story} onClose={() => { setShowFeeds(false); loadFeedCount(); }} onChanged={loadFeedCount}/>}
       </div>
       {/* Source diversity warning */}
       {sourceDiversityWarning && (
@@ -5342,8 +5459,10 @@ function EditableStoryTitle({ story, onUpdateStory }) {
 }
 
 // One scored article under a prediction, with controls to override the AI's call or score it again.
-function PredictionLinkCard({ link, color, busy, onSetStance, onRescore }) {
+function PredictionLinkCard({ link, color, busy, onSetStance, onRescore, onSeparate }) {
   const item = link.item || {};
+  const grp = link.group;
+  const echo = !!(grp && grp.echo);
   let host = item.source || '';
   if (!host && item.url) { try { host = new URL(item.url).hostname.replace('www.', ''); } catch (e) {} }
   const STANCES = [['supports','Supports','#059669'],['contradicts','Contradicts','#dc2626'],['complicates','Complicates','#d97706'],['irrelevant','Irrelevant','#6b7280']];
@@ -5351,14 +5470,27 @@ function PredictionLinkCard({ link, color, busy, onSetStance, onRescore }) {
   const chip = (active, col) => ({fontSize:11,padding:'2px 9px',borderRadius:10,cursor:busy?'default':'pointer',
     border:`1px solid ${active ? col : C.borderLight}`,background:active ? col : 'transparent',color:active ? '#fff' : C.textMid});
   return (
-    <div style={{padding:'10px 12px',borderRadius:8,background:C.surface,border:`1px solid ${C.borderLight}`,opacity:busy ? 0.6 : 1}}>
+    <div style={{padding:'10px 12px',borderRadius:8,background:C.surface,border:`1px solid ${C.borderLight}`,opacity:busy ? 0.6 : echo ? 0.72 : 1}}>
       <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-        <span style={{fontSize:18,fontWeight:900,color,lineHeight:1,minWidth:36,textAlign:'center'}}>{unscored ? '—' : link.weight}</span>
+        <span style={{fontSize:18,fontWeight:900,color:echo ? C.textMute : color,lineHeight:1,minWidth:36,textAlign:'center',textDecoration:echo ? 'line-through' : 'none'}} title={echo ? 'Not counted: this story is already counted through another article' : ''}>{unscored ? '—' : link.weight}</span>
         <div style={{flex:1,minWidth:0}}>
           <a href={item.url} target="_blank" rel="noopener noreferrer" style={{fontSize:13,fontWeight:600,color:C.text,textDecoration:'none',lineHeight:1.4,display:'block',marginBottom:4}}>
             {item.title || 'Untitled'}
           </a>
           <div style={{fontSize:11,color:C.textMute,marginBottom:4}}>{host || 'Unknown source'}{link.tagger === 'user' ? ' · ✎ set by you' : ''}</div>
+          {grp && (
+            <div style={{fontSize:11,color:C.accent,marginBottom:5,lineHeight:1.45,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <span title={(grp.outlets || []).join(', ')}>
+                {echo ? '↳ Same story as a stronger article here, so it isn’t counted again' : `🔗 Same story in ${grp.size} articles (${(grp.outlets || []).slice(0, 4).join(', ')}${(grp.outlets || []).length > 4 ? '…' : ''}), counted once`}
+              </span>
+              {onSeparate && <button disabled={busy} onClick={() => onSeparate(link)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:11,textDecoration:'underline',padding:0}}>Not the same story</button>}
+            </div>
+          )}
+          {link.countSeparately && !grp && onSeparate && (
+            <div style={{fontSize:11,color:C.textMute,marginBottom:5}}>Counted on its own (you marked it as a different story).{' '}
+              <button disabled={busy} onClick={() => onSeparate(link)} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:11,textDecoration:'underline',padding:0}}>Undo</button>
+            </div>
+          )}
           {link.reason
             ? <div style={{fontSize:12,color:link.stance === 'error' ? '#d97706' : C.textMid,lineHeight:1.5,fontStyle:'italic'}}>{link.reason}</div>
             : (link.stance === 'pending' && <div style={{fontSize:12,color:C.textMute}}>Waiting to be scored…</div>)}
@@ -5374,6 +5506,323 @@ function PredictionLinkCard({ link, color, busy, onSetStance, onRescore }) {
       </div>
     </div>
   );
+}
+
+// ── Saved copies of articles ─────────────────────────────────────────────────
+async function archiveJson(pathAndQuery, opts) {
+  try {
+    const r = await fetch('/api/lateral/archive/' + pathAndQuery, opts);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.error) d.error = `HTTP ${r.status}`;
+    return d;
+  } catch (e) { return { error: e.message }; }
+}
+const archivePost = (p, body) => archiveJson(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+// Reads one saved article. `inline` renders it without its own modal (used inside the Library).
+function ArticleReader({ archiveKey, onClose, onDeleted, inline, extra }) {
+  const [doc, setDoc] = useState(null);
+  const [err, setErr] = useState('');
+  const [ver, setVer] = useState(0);
+  useEffect(() => {
+    if (ver === 0) setDoc(null);
+    setErr('');
+    archiveJson('get?key=' + encodeURIComponent(archiveKey)).then(d => (d.error ? setErr(d.error) : setDoc(d)));
+  }, [archiveKey, ver]);
+
+  async function remove() {
+    if (!window.confirm('Delete this saved copy? The original article is not affected.')) return;
+    await archiveJson('item?key=' + encodeURIComponent(archiveKey), { method: 'DELETE' });
+    if (onDeleted) onDeleted();
+    if (onClose) onClose();
+  }
+
+  const body = (
+    <div>
+      {err && <div style={{color:'#dc2626',fontSize:13}}>{err}</div>}
+      {!doc && !err && <div style={{color:C.textMute,fontSize:13}}>Loading…</div>}
+      {doc && (
+        <>
+          <div style={{fontSize:21,fontWeight:900,color:C.text,lineHeight:1.25,fontFamily:"'Playfair Display', Georgia, serif",marginBottom:8}}>{doc.title}</div>
+          <div style={{fontSize:12,color:C.textMute,lineHeight:1.6,marginBottom:12}}>
+            {[doc.site, doc.byline && `by ${doc.byline}`, doc.publishedAt && new Date(doc.publishedAt).toLocaleDateString(), `${(doc.words || 0).toLocaleString()} words`].filter(Boolean).join(' · ')}
+            <br/>
+            Saved {new Date(doc.savedAt).toLocaleString()}{doc.method === 'tavily' ? ' (via Tavily Extract)' : ''}, kept only on this computer.
+          </div>
+          {extra && extra(doc, () => setVer(v => v + 1))}
+          <div style={{display:'flex',gap:10,marginBottom:14,alignItems:'center'}}>
+            <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:700,color:C.accent}}>Open original ↗</a>
+            <button onClick={remove} style={{marginLeft:'auto',background:'none',border:'none',cursor:'pointer',color:'#dc2626',fontSize:11.5,fontWeight:700,padding:0}}>Delete saved copy</button>
+          </div>
+          <div style={{borderTop:`1px solid ${C.borderLight}`,paddingTop:14,maxHeight:inline ? 'none' : '58vh',overflowY:inline ? 'visible' : 'auto'}}>
+            {String(doc.text || '').split(/\n\n+/).map((p, i) => (p.startsWith('## ')
+              ? <h3 key={i} style={{fontSize:15,fontWeight:800,color:C.text,margin:'18px 0 6px'}}>{p.slice(3)}</h3>
+              : <p key={i} style={{fontSize:14,lineHeight:1.75,color:C.text,margin:'0 0 12px',maxWidth:'68ch'}}>{p}</p>))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+  return inline ? body : <Modal title="Saved copy" onClose={onClose} maxWidth={720}>{body}</Modal>;
+}
+
+// "Save a copy" / "Saved copy" button for one article. Renders as one cell of the joined .ep-seg control.
+function SavedCopyChip({ url, title, storyId }) {
+  const [st, setSt] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const check = () => archivePost('status', { urls: [url] }).then(d => setSt((d.status || {})[url] || { saved: false }));
+  useEffect(() => { setSt(null); setMsg(''); if (url) check(); }, [url]);
+  useEffect(() => { if (!st || !st.pending) return; const t = setInterval(check, 4000); return () => clearInterval(t); }, [st && st.pending, url]);
+  if (!url) return null;
+
+  const openInLibrary = (key) => window.dispatchEvent(new CustomEvent('lateral-open-library', { detail: { key } }));
+  async function save() {
+    setBusy(true); setMsg('');
+    const d = await archivePost('save', { url, title, storyId });
+    setBusy(false);
+    if (d.ok) { await check(); openInLibrary(d.key); } else setMsg(d.reason || d.error || 'Could not save a copy.');
+  }
+  const saving = busy || (st && st.pending);
+  const saved = st && st.saved;
+  const bookmark = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M7 4h10a1 1 0 011 1v15l-6-3.6L6 20V5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill={saved ? 'currentColor' : 'none'}/>
+    </svg>
+  );
+  return (
+    <span style={{flexDirection:'column'}}>
+      {saved
+        ? <button className="ep-cell" onClick={() => openInLibrary(st.key)} title="Read it in the Library">{bookmark}Saved copy{st.words ? <span style={{fontWeight:500,opacity:0.7}}>· {st.words.toLocaleString()}w</span> : null}</button>
+        : <button className="ep-cell" onClick={save} disabled={saving || !st} title="Keep a readable copy of this article on this computer">{bookmark}{saving ? 'Saving…' : 'Save a copy'}</button>}
+      {msg && <span style={{display:'block',fontSize:10.5,color:'#b45309',padding:'0 10px 7px',lineHeight:1.35}}>{msg}</span>}
+      {st && !saved && !msg && st.failed && <span style={{display:'block',fontSize:10.5,color:C.textMute,padding:'0 10px 7px',lineHeight:1.35}}>Last try: {st.failed}</span>}
+    </span>
+  );
+}
+
+// ── Library: saved articles, shown as a list in the left panel and read in the center panel ──
+const libStoryTitle = (stories, id) => { const st = (stories || []).find(x => x.id === id); return st ? st.title.replace(' (Prediction)', '') : ''; };
+const libDate = d => { try { return d ? new Date(d).toLocaleDateString() : ''; } catch { return ''; } };
+
+function LibraryList({ stories, selectedKey, onOpen, filterStory, onFilterStory, tick }) {
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState(null);
+  const [stats, setStats] = useState(null);
+  const loadStats = () => archiveJson('stats').then(d => { if (!d.error) setStats(d); });
+  useEffect(() => { loadStats(); }, [tick]);
+  useEffect(() => { if (!stats || !stats.pending) return; const t = setInterval(loadStats, 4000); return () => clearInterval(t); }, [stats && stats.pending]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const sf = filterStory ? '&storyId=' + encodeURIComponent(filterStory) : '';
+      archiveJson(q.trim() ? `search?q=${encodeURIComponent(q.trim())}${sf}&limit=60` : `list?limit=500${sf}`).then(d => setItems(d.results || d.items || []));
+    }, q ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [q, filterStory, tick, stats && stats.saved]);
+
+  const storyOpts = [...(stories || [])].sort((a, b) => a.title.localeCompare(b.title));
+  const searching = !!q.trim();
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>
+      <div style={{padding:'0 14px 8px'}}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search the full text of saved articles…" style={{...inputStyle,background:C.surface,padding:'7px 11px',fontSize:12.5}}/>
+        <select value={filterStory || ''} onChange={e => onFilterStory(e.target.value)} style={{...inputStyle,background:C.surface,padding:'6px 9px',fontSize:12,marginTop:8}}>
+          <option value="">All saved articles</option>
+          <option value="_none">Not linked to a tracked story</option>
+          {storyOpts.map(st => <option key={st.id} value={st.id}>{st.predictionId ? '🔮 ' : ''}{st.title.replace(' (Prediction)', '').slice(0, 60)}</option>)}
+        </select>
+      </div>
+      <div style={{flex:1,overflowY:'auto',padding:'0 10px 10px'}}>
+        {items === null && <div style={{textAlign:'center',color:C.textMute,fontSize:12.5,padding:'30px 0'}}>Loading…</div>}
+        {items && items.length === 0 && (
+          <div style={{textAlign:'center',color:C.textMute,fontSize:12.5,padding:'30px 12px',lineHeight:1.5}}>
+            {searching ? 'No saved article matches that.' : filterStory ? 'Nothing saved for this selection yet.' : 'Nothing saved yet. Open the Library page to save what you already track.'}
+          </div>
+        )}
+        {(items || []).map(it => {
+          const on = it.key === selectedKey;
+          const linked = (it.storyIds || []).map(id => libStoryTitle(stories, id)).filter(Boolean);
+          return (
+            <button key={it.key} onClick={() => onOpen(it.key)}
+              style={{display:'block',width:'100%',textAlign:'left',background:on ? C.accent + '18' : C.surface,border:`1px solid ${on ? C.accent : C.borderLight}`,borderRadius:8,padding:'8px 10px',marginBottom:6,cursor:'pointer'}}>
+              <div style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35}}>{it.title}</div>
+              <div style={{fontSize:10.5,color:C.textMute,marginTop:2}}>{[it.site, libDate(it.publishedAt || it.savedAt), `${(it.words || 0).toLocaleString()} words`].filter(Boolean).join(' · ')}</div>
+              {linked.length > 0 && <div style={{fontSize:10.5,color:C.accent,marginTop:3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>↳ {linked[0]}{linked.length > 1 ? ` +${linked.length - 1}` : ''}</div>}
+              {searching && it.snippet && <div style={{fontSize:11,color:C.textMid,marginTop:4,lineHeight:1.45}}>{it.snippet}</div>}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{padding:'8px 14px 58px',borderTop:`1px solid ${C.border}`,fontSize:11,color:C.textMute}}>
+        {stats ? `${stats.saved.toLocaleString()} saved · ${stats.words.toLocaleString()} words${stats.pending ? ` · ${stats.pending} saving…` : ''}` : ' '}
+      </div>
+    </div>
+  );
+}
+
+// Center panel for the Library: a landing page when nothing is open, otherwise one saved article with its story links.
+function LibraryCenter({ keyId, stories, onSelectKey, onFilterStory, onOpenStory, onChanged, tick }) {
+  const [stats, setStats] = useState(null);
+  const [all, setAll] = useState([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const loadStats = () => archiveJson('stats').then(d => { if (!d.error) setStats(d); });
+  useEffect(() => { loadStats(); }, [tick, keyId]);
+  useEffect(() => { if (!stats || !stats.pending) return; const t = setInterval(loadStats, 4000); return () => clearInterval(t); }, [stats && stats.pending]);
+  useEffect(() => { if (!keyId) archiveJson('list?limit=500').then(d => setAll(d.items || [])); }, [keyId, tick, stats && stats.saved]);
+
+  async function backfill() {
+    setBusy(true); setNote('');
+    const d = await archivePost('backfill');
+    setBusy(false);
+    setNote(d.error ? d.error : d.found === 0 ? 'Nothing to save yet. Add episodes, or run a prediction search first.'
+      : `Found ${d.found} article${d.found === 1 ? '' : 's'} across your stories and predictions; ${d.queued} queued to save${d.skipped ? `, ${d.skipped} already saved (their story links were refreshed)` : ''}. This runs in the background.`);
+    loadStats(); if (onChanged) onChanged();
+  }
+
+  const wrap = {flex:1,minWidth:0,overflowY:'auto',padding:'22px 28px 60px',background:C.bg};
+
+  if (keyId) {
+    const extra = (doc, reload) => {
+      const linkedIds = doc.storyIds || [];
+      const free = (stories || []).filter(st => !linkedIds.includes(st.id)).sort((a, b) => a.title.localeCompare(b.title));
+      const tag = async (storyId, remove) => { await archivePost('tag', { key: doc.key, storyId, remove: !!remove }); reload(); if (onChanged) onChanged(); };
+      return (
+        <div style={{margin:'0 0 14px',padding:'10px 12px',borderRadius:8,background:C.surface,border:`1px solid ${C.borderLight}`}}>
+          <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>Tracked stories</div>
+          {linkedIds.length === 0 && <div style={{fontSize:12,color:C.textMute,marginBottom:6}}>Not linked to a tracked story yet.</div>}
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:linkedIds.length ? 8 : 0}}>
+            {linkedIds.map(id => {
+              const t = libStoryTitle(stories, id);
+              return (
+                <span key={id} style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:12,fontWeight:700,color:C.accent,border:`1px solid ${C.border}`,borderRadius:14,padding:'3px 5px 3px 10px',background:C.bg}}>
+                  <button onClick={() => onOpenStory(id)} title="Open this story" style={{background:'none',border:'none',cursor:'pointer',color:'inherit',fontWeight:'inherit',fontSize:'inherit',padding:0}}>{t || 'Removed story'}</button>
+                  <button onClick={() => tag(id, true)} title="Unlink" style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:13,lineHeight:1,padding:'0 3px'}}>×</button>
+                </span>
+              );
+            })}
+          </div>
+          {free.length > 0 && (
+            <select value="" onChange={e => { if (e.target.value) tag(e.target.value, false); }} style={{...inputStyle,fontSize:12,padding:'5px 8px',maxWidth:340}}>
+              <option value="">Link to a tracked story…</option>
+              {free.map(st => <option key={st.id} value={st.id}>{st.predictionId ? '🔮 ' : ''}{st.title.replace(' (Prediction)', '').slice(0, 70)}</option>)}
+            </select>
+          )}
+        </div>
+      );
+    };
+    return (
+      <div style={wrap}>
+        <div style={{maxWidth:760,margin:'0 auto'}}>
+          <button onClick={() => onSelectKey(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:700,padding:0,marginBottom:12}}>← Library</button>
+          <ArticleReader archiveKey={keyId} inline extra={extra} onDeleted={() => { onSelectKey(null); if (onChanged) onChanged(); }}/>
+        </div>
+      </div>
+    );
+  }
+
+  const counts = {};
+  let unlinked = 0;
+  all.forEach(it => { const ids = it.storyIds || []; if (!ids.length) unlinked++; ids.forEach(id => { counts[id] = (counts[id] || 0) + 1; }); });
+  const rows = (stories || []).filter(st => counts[st.id]).sort((a, b) => counts[b.id] - counts[a.id]);
+  const card = {background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'14px 16px',marginBottom:14};
+  return (
+    <div style={wrap}>
+      <div style={{maxWidth:760,margin:'0 auto'}}>
+        <div style={{fontSize:24,fontWeight:900,color:C.text,fontFamily:"'Playfair Display', Georgia, serif",marginBottom:6}}>Library</div>
+        <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:16}}>
+          Readable copies of the articles behind your stories and predictions, kept on this computer so your timelines survive dead links. Pick an article from the list on the left, or search the full text of everything saved.
+        </div>
+        <div style={card}>
+          <div style={{fontSize:13,color:C.text,marginBottom:10}}>
+            {stats ? <><strong>{stats.saved.toLocaleString()}</strong> saved · {stats.words.toLocaleString()} words{stats.pending ? ` · ${stats.pending} saving now…` : ''}{stats.failed ? ` · ${stats.failed} couldn’t be saved` : ''}</> : 'Loading…'}
+          </div>
+          <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+            <Btn variant="secondary" onClick={backfill} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>{busy ? 'Working…' : 'Save & link everything I already track'}</Btn>
+            {note && <span style={{fontSize:11.5,color:C.textMid,flex:1,minWidth:220}}>{note}</span>}
+          </div>
+          <div style={{fontSize:11.5,color:C.textMute,marginTop:8,lineHeight:1.5}}>New episodes and prediction evidence are saved automatically (Settings → Basic). This button catches up on what you already had, and links each article to the story it came from.</div>
+        </div>
+        {(rows.length > 0 || unlinked > 0) && (
+          <div style={card}>
+            <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:8}}>By tracked story</div>
+            {rows.map(st => (
+              <div key={st.id} style={{display:'flex',alignItems:'center',gap:10,padding:'5px 0'}}>
+                <button onClick={() => onFilterStory(st.id)} title="Show these articles in the list" style={{flex:1,textAlign:'left',background:'none',border:'none',cursor:'pointer',color:C.text,fontSize:13,fontWeight:600,padding:0}}>{st.predictionId ? '🔮 ' : ''}{st.title.replace(' (Prediction)', '')}</button>
+                <span style={{fontSize:12,color:C.textMute}}>{counts[st.id]}</span>
+                <button onClick={() => onOpenStory(st.id)} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:0}}>Open story →</button>
+              </div>
+            ))}
+            {unlinked > 0 && (
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'5px 0',marginTop:4,borderTop:`1px solid ${C.borderLight}`}}>
+                <button onClick={() => onFilterStory('_none')} style={{flex:1,textAlign:'left',background:'none',border:'none',cursor:'pointer',color:C.textMid,fontSize:13,padding:0}}>Not linked to a tracked story</button>
+                <span style={{fontSize:12,color:C.textMute}}>{unlinked}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Small line icon used by the nav and header buttons.
+function LIcon({ children, size = 14 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
+}
+const ICONS = {
+  refresh: <><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></>,
+  check: <path d="M5 12.5l4.5 4.5L19 7.5"/>,
+  brief: <><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h6"/></>,
+  export: <><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/></>,
+  map: <><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M8 8l3 7M16 8l-3 7M8.4 7h7.2"/></>,
+  library: <><path d="M5 4.5h9.5a3 3 0 013 3V20H8a3 3 0 01-3-3V4.5z"/><path d="M5 17a3 3 0 013-3h9.5"/></>,
+  gear: <><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M4.5 7.4l2.1 1.2M17.4 15.4l2.1 1.2M4.5 16.6l2.1-1.2M17.4 8.6l2.1-1.2"/></>,
+  share: <><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.2 10.9l7.6-3.8M8.2 13.1l7.6 3.8"/></>,
+  doc: <><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></>,
+  clock: <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></>,
+  bolt: <path d="M13 3L5 13.5h6L10 21l8-10.5h-6L13 3z"/>,
+  search: <><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></>,
+  plus: <path d="M12 5v14M5 12h14"/>,
+  bell: <><path d="M6 17h12l-1.5-2v-4a4.5 4.5 0 10-9 0v4L6 17z"/><path d="M10 20a2 2 0 004 0"/></>,
+  warn: <><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17.5v.01"/></>,
+  rss: <><path d="M5 5a14 14 0 0114 14"/><path d="M5 11a8 8 0 018 8"/><circle cx="6" cy="18" r="1.4" fill="currentColor"/></>,
+  trend: <><path d="M4 16l5-5 4 4 7-8"/><path d="M15 7h5v5"/></>,
+  coin: <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.5-2.5 1.8-2.5.8-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></>,
+};
+
+// The row of tool buttons in the top bar (used by both the desktop and the mobile layouts).
+function NavActions({ refreshingHL, refreshHLDone, refreshHLProg, onRefresh, briefNudge, onBrief, showNotebook, onNotebook, onMap }) {
+  const prog = `${(refreshHLProg && refreshHLProg.i) || 0}/${(refreshHLProg && refreshHLProg.total) || 0}`;
+  return (
+    <>
+      <button className={`tb-btn gold${refreshHLDone ? ' done' : refreshingHL ? ' busy' : ''}`} onClick={onRefresh} disabled={refreshingHL}
+        title={refreshingHL ? `Refreshing ${prog}: ${(refreshHLProg && refreshHLProg.title) || ''}` : 'Refresh headlines for all active stories'}>
+        <LIcon>{refreshHLDone ? ICONS.check : ICONS.refresh}</LIcon>
+        {refreshHLDone ? 'Refreshed' : refreshingHL ? prog : 'Headlines'}
+      </button>
+      <button className="tb-btn" style={{'--tb':'#b86b4a'}} onClick={onBrief} title={briefNudge ? 'New coverage detected since your last brief — click to regenerate' : 'Open Intelligence Brief'}>
+        <LIcon>{ICONS.brief}</LIcon>Brief
+        {briefNudge && <span style={{position:'absolute',top:-3,right:-3,width:8,height:8,borderRadius:'50%',background:'#f59e0b',border:'1.5px solid var(--surface)',boxShadow:'0 0 0 1px #f59e0b'}}/>}
+      </button>
+      {showNotebook && (
+        <button className="tb-btn" style={{'--tb':'#0f766e'}} onClick={onNotebook} title="Export selected stories as NotebookLM-ready plain-text bundle">
+          <LIcon>{ICONS.export}</LIcon>NotebookLM
+        </button>
+      )}
+      <button className="tb-btn" style={{'--tb':'#7c3aed'}} onClick={onMap} title="Spider Map — visualize story connections">
+        <LIcon>{ICONS.map}</LIcon>Map
+      </button>
+    </>
+  );
+}
+
+// "Saved (N)" shortcut on a story: opens the Library filtered to that story's articles.
+function SavedCountButton({ storyId, onOpen }) {
+  const [n, setN] = useState(0);
+  useEffect(() => { let off = false; setN(0); if (storyId) archiveJson('list?limit=500&storyId=' + encodeURIComponent(storyId)).then(d => { if (!off) setN((d.items || []).length); }); return () => { off = true; }; }, [storyId]);
+  if (!n || !onOpen) return null;
+  return <button className="hd-cell" onClick={() => onOpen(storyId)} title="Saved copies of this story's articles"><LIcon>{ICONS.doc}</LIcon>Saved ({n})</button>;
 }
 
 // Record how a prediction turned out, and show the running track record: did the evidence balance lean the way
@@ -5451,7 +5900,7 @@ function OutcomePanel({ prediction, pid, HL, onChanged }) {
   );
 }
 
-function PredictionCenterView({ story }) {
+function PredictionCenterView({ story, onOpenLibrary }) {
   const [prediction, setPrediction] = useState(null);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5464,6 +5913,7 @@ function PredictionCenterView({ story }) {
   const [newType, setNewType] = useState('indicator');
   const [linkBusy, setLinkBusy] = useState('');
   const [showIrrelevant, setShowIrrelevant] = useState(false);
+  const [grouping, setGrouping] = useState(null);
   const pid = story?.predictionId;
 
   function loadAll() {
@@ -5475,9 +5925,24 @@ function PredictionCenterView({ story }) {
       if (pData?.prediction) setPrediction(pData.prediction);
       if (pData?.evidence) setEvidence(pData.evidence);
       if (lData?.links) setLinks(lData.links);
+      setGrouping((lData && lData.grouping) || (pData && pData.grouping) || null);
       window.dispatchEvent(new CustomEvent('lateral-prediction-updated', { detail: pid }));
     });
   }
+
+  // Same-story grouping runs in the background (the local model judges candidate pairs). Ask for it once when this
+  // prediction is opened, then refresh while it works so groups appear as soon as they are decided.
+  const groupAskedRef = useRef('');
+  useEffect(() => {
+    if (!pid || loading || groupAskedRef.current === pid) return;
+    groupAskedRef.current = pid;
+    fetch(`/v2/predictions/${pid}/group`, { method:'POST' }).then(r => r.ok ? r.json() : null).then(d => { if (d && d.grouping) setGrouping(d.grouping); }).catch(() => {});
+  }, [pid, loading]);
+  useEffect(() => {
+    if (!pid || !grouping || grouping.state !== 'running') return;
+    const t = setInterval(() => { loadAll(); }, 4000);
+    return () => clearInterval(t);
+  }, [pid, grouping && grouping.state]);
 
   useEffect(() => {
     if (!pid) return;
@@ -5537,6 +6002,17 @@ function PredictionCenterView({ story }) {
       const r = await fetch(`/v2/links/${link.id}/score`, { method:'POST' });
       const d = await r.json();
       if (!r.ok || d.error) throw new Error(d.error || 'Could not re-score that article');
+      await loadAll();
+    } catch (e) { setSigErr(e.message); }
+    setLinkBusy('');
+  }
+  // Same-story grouping override: count this article on its own (or put it back with its group).
+  async function toggleSeparate(link) {
+    setLinkBusy(link.id); setSigErr('');
+    try {
+      const r = await fetch(`/v2/links/${link.id}/separate`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ separate: !link.countSeparately }) });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || 'Could not change that');
       await loadAll();
     } catch (e) { setSigErr(e.message); }
     setLinkBusy('');
@@ -5610,10 +6086,13 @@ function PredictionCenterView({ story }) {
             )}
             {(story.tags||[]).length>0 && <CompactPillCloud items={story.tags} maxVisible={5} moreLabel="more tags" gap={4}/>}
           </div>
-          <div style={{display:'flex',gap:7,flexShrink:0}}>
-            <Btn variant="ghost" onClick={() => shareStoryTimeline(story)} style={{padding:'6px 11px',fontSize:12}}>
-              🔗 Share
-            </Btn>
+          <div style={{flexShrink:0}}>
+            <div className="hd-seg">
+              <SavedCountButton storyId={story.id} onOpen={onOpenLibrary}/>
+              <button className="hd-cell" onClick={() => shareStoryTimeline(story)} title="Generate a shareable page">
+                <LIcon>{ICONS.share}</LIcon>Share
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -5658,6 +6137,14 @@ function PredictionCenterView({ story }) {
                 <span>∼ {evidence.complicates} complicates</span>
                 <span>{evidence.irrelevant} irrelevant</span>
               </div>
+              {evidence.echoes > 0 && (
+                <div style={{marginTop:6,fontSize:11,color:C.accent,lineHeight:1.5}}>
+                  🔗 {evidence.total} articles, {evidence.events} separate stor{evidence.events === 1 ? 'y' : 'ies'}: {evidence.echoes} article{evidence.echoes === 1 ? ' repeats' : 's repeat'} a story that is already counted, so the balance counts each story once.
+                </div>
+              )}
+              {grouping && grouping.state === 'running' && (
+                <div style={{marginTop:6,fontSize:11,color:C.textMute}}>Checking for articles that report the same story…</div>
+              )}
               <div style={{marginTop:8,fontSize:11,color:C.textMute,lineHeight:1.5,fontStyle:'italic'}}>
                 Shows which way the news found so far leans: −100 = all against, +100 = all for. It is not a probability and doesn’t change your confidence.
               </div>
@@ -5729,7 +6216,7 @@ function PredictionCenterView({ story }) {
             <div style={{...HL,color:g.color,marginBottom:10}}>{g.label} ({g.list.length})</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {g.list.map(link => (
-                <PredictionLinkCard key={link.id} link={link} color={g.color} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink}/>
+                <PredictionLinkCard key={link.id} link={link} color={g.color} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink} onSeparate={toggleSeparate}/>
               ))}
             </div>
           </div>
@@ -5740,7 +6227,7 @@ function PredictionCenterView({ story }) {
             <div style={{...HL,color:'#d97706',marginBottom:10}}>⚠ Not scored ({needsScoring.length})</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {needsScoring.map(link => (
-                <PredictionLinkCard key={link.id} link={link} color={C.textMute} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink}/>
+                <PredictionLinkCard key={link.id} link={link} color={C.textMute} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink} onSeparate={toggleSeparate}/>
               ))}
             </div>
           </div>
@@ -5754,7 +6241,7 @@ function PredictionCenterView({ story }) {
             {showIrrelevant && (
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 {irrelevant.map(link => (
-                  <PredictionLinkCard key={link.id} link={link} color={C.textMute} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink}/>
+                  <PredictionLinkCard key={link.id} link={link} color={C.textMute} busy={linkBusy === link.id} onSetStance={setStance} onRescore={rescoreLink} onSeparate={toggleSeparate}/>
                 ))}
               </div>
             )}
@@ -5765,7 +6252,7 @@ function PredictionCenterView({ story }) {
   );
 }
 
-function CenterPanel({ story, selEpId, onSelEp, onAddEp, onDiscover, onRegen, aiLoading, onDeleteEp, settings, onAddFromHeadline, onAddPodcast, onStoryRefreshed, onSaveBriefAsEpisode, onBackfill, onUpdateStory }) {
+function CenterPanel({ onOpenLibrary, story, selEpId, onSelEp, onAddEp, onDiscover, onRegen, aiLoading, onDeleteEp, settings, onAddFromHeadline, onAddPodcast, onStoryRefreshed, onSaveBriefAsEpisode, onBackfill, onUpdateStory }) {
   const [contentMode, setContentMode] = useState('headlines');
   const [winW, setWinW] = useState(() => window.innerWidth);
   useEffect(() => {
@@ -5789,7 +6276,7 @@ function CenterPanel({ story, selEpId, onSelEp, onAddEp, onDiscover, onRegen, ai
 
   // Prediction story — render prediction center view
   if (story.predictionId) {
-    return <PredictionCenterView story={story} />;
+    return <PredictionCenterView story={story} onOpenLibrary={onOpenLibrary} />;
   }
 
   // Normal story — existing timeline view
@@ -5810,20 +6297,29 @@ function CenterPanel({ story, selEpId, onSelEp, onAddEp, onDiscover, onRegen, ai
           {(story.tags||[]).length>0&&<CompactPillCloud items={story.tags} maxVisible={3} moreLabel="more tags" gap={4}/>}
         </div>
         {((story.episodes||[]).length>0 || story.status !== 'resolved') && (
-          <div style={{display:'flex',gap:7,flexShrink:0,flexWrap:'wrap'}}>
-            {(story.episodes||[]).length>0 && (
-              <Btn variant="ghost" onClick={() => shareStoryTimeline(story)} style={{padding:'6px 11px',fontSize:12}} title="Generate a shareable timeline webpage of every episode">
-                🔗 Share
-              </Btn>
+          <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap',alignItems:'center'}}>
+            <div className="hd-seg">
+              {(story.episodes||[]).length>0 && (
+                <button className="hd-cell" onClick={() => shareStoryTimeline(story)} title="Generate a shareable timeline webpage of every episode">
+                  <LIcon>{ICONS.share}</LIcon>Share
+                </button>
+              )}
+              <SavedCountButton storyId={story.id} onOpen={onOpenLibrary}/>
+              <button className="hd-cell" onClick={onBackfill} title="Search Wikipedia (or paste a source) to backfill this story's history as dated episodes">
+                <LIcon>{ICONS.clock}</LIcon>Backfill
+              </button>
+              {story.status !== 'resolved' && (<>
+                <button className="hd-cell" onClick={onRegen} disabled={aiLoading} title="Regenerate this story's summary and tags">
+                  <LIcon>{ICONS.bolt}</LIcon>{aiLoading ? '…' : 'Regen'}
+                </button>
+                <button className="hd-cell" onClick={onDiscover} title="Search for more coverage of this story">
+                  <LIcon>{ICONS.search}</LIcon>Discover
+                </button>
+              </>)}
+            </div>
+            {story.status !== 'resolved' && (
+              <button className="hd-primary" onClick={onAddEp}><LIcon size={13}>{ICONS.plus}</LIcon>Episode</button>
             )}
-            <Btn variant="ghost" onClick={onBackfill} style={{padding:'6px 11px',fontSize:12}} title="Search Wikipedia (or paste a source) to backfill this story's history as dated episodes">
-              ⏳ Backfill
-            </Btn>
-            {story.status !== 'resolved' && (<>
-              <Btn variant="ghost" onClick={onRegen} disabled={aiLoading} style={{padding:'6px 11px',fontSize:12}}>{aiLoading?'…':'⚡ Regen'}</Btn>
-              <Btn variant="ghost" onClick={onDiscover} style={{padding:'6px 11px',fontSize:12}}>🔍 Discover</Btn>
-              <Btn onClick={onAddEp} style={{padding:'6px 13px',fontSize:12}}>+ Episode</Btn>
-            </>)}
           </div>
         )}
       </div>
@@ -6064,33 +6560,40 @@ function EpisodeDetail({ story, ep, onUpdateEp, onDeleteEp, settings, onPopOut }
           style={{...taS, minHeight:90, background:'#fffdf5', borderColor:'#e5ddb0'}}/>
       </div>
 
-      {/* Source */}
-      {ep.sourceUrl && (
-        <a href={ep.sourceUrl} target="_blank" rel="noopener noreferrer"
-          style={{fontSize:12,color:C.accent,display:'block',marginBottom:14,wordBreak:'break-all'}}>
-          Source article →
-        </a>
-      )}
-
-      {/* Analyze + Delete */}
-      <div style={{display:'flex',gap:8,marginTop:4}}>
-        <button onClick={analyze} disabled={analyzing}
-          style={{flex:1,padding:'8px 11px',borderRadius:8,border:`1.5px solid ${C.border}`,
-                  background:C.bg,color:C.text,fontSize:11.5,fontWeight:700,cursor:analyzing?'not-allowed':'pointer',
-                  opacity:analyzing?0.45:1,transition:'opacity 0.15s'}}>
-          {analyzing?'Analyzing…':'✦ Analyze'}
-        </button>
-        {onDeleteEp && (
-          <button onClick={()=>{if(window.confirm('Delete this episode?'))onDeleteEp(ep.id);}}
-            style={{flexShrink:0,border:'1.5px solid #fca5a5',background:'none',color:'#dc2626',borderRadius:7,
-                    cursor:'pointer',fontSize:12,padding:'6px 12px'}}>
-            Delete
-          </button>
-        )}
-      </div>
+      {/* Actions: Analyze on top, source + saved copy in the middle, Delete at the bottom */}
+      <button className="ep-primary" onClick={analyze} disabled={analyzing} style={{marginTop:4}}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" fill="currentColor"/>
+          <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" fill="currentColor" opacity="0.8"/>
+        </svg>
+        {analyzing ? 'Analyzing…' : 'Analyze'}
+      </button>
       {analyzeError && (
         <div style={{fontSize:11.5,color:'#dc2626',marginTop:8,lineHeight:1.45}}>
           Analyze failed: {analyzeError}
+        </div>
+      )}
+
+      {ep.sourceUrl && (
+        <div className="ep-seg">
+          <a className="ep-cell" href={ep.sourceUrl} target="_blank" rel="noopener noreferrer" title="Open the original article">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Source
+          </a>
+          <SavedCopyChip url={ep.sourceUrl} title={ep.headline} storyId={story && story.id}/>
+        </div>
+      )}
+
+      {onDeleteEp && (
+        <div style={{marginTop:14,paddingTop:8,borderTop:`1px solid ${C.borderLight}`}}>
+          <button className="ep-danger" onClick={()=>{if(window.confirm('Delete this episode?'))onDeleteEp(ep.id);}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Delete episode
+          </button>
         </div>
       )}
     </div>
@@ -7495,6 +7998,489 @@ function BackfillModal({ story, onClose, onAdd, settings }) {
   );
 }
 
+// ── RSS / Atom ───────────────────────────────────────────────────────────────
+async function feedsJson(sub, opts) {
+  try {
+    const r = await fetch('/api/lateral/feeds/' + sub, opts);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.error) d.error = `HTTP ${r.status}`;
+    return d;
+  } catch (e) { return { error: e.message }; }
+}
+const feedsPost = (sub, body) => feedsJson(sub, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+function copyText(t) {
+  try { navigator.clipboard.writeText(t); return true; } catch { /* fall back */ }
+  try { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); return true; } catch { return false; }
+}
+
+// Attach feeds to one story: paste a feed or a site address, or import an OPML file.
+function StoryFeedsModal({ story, onClose, onChanged }) {
+  const [subs, setSubs] = useState(null);
+  const [input, setInput] = useState('');
+  const [found, setFound] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+  const [token, setToken] = useState('');
+  const [base, setBase] = useState(window.location.origin);
+  const fileRef = useRef(null);
+  const loadSubs = () => feedsJson('subs?storyId=' + encodeURIComponent(story.id)).then(d => setSubs(d.subs || []));
+  useEffect(() => {
+    loadSubs();
+    feedsJson('info').then(d => setToken(d.token || ''));
+    alertsJson('config').then(d => { if (d.config && d.config.appUrl) setBase(d.config.appUrl); });
+  }, []);
+
+  async function look() {
+    if (!input.trim()) return;
+    setBusy('look'); setMsg(''); setFound(null);
+    const d = await feedsPost('preview', { url: input.trim() });
+    setBusy('');
+    if (d.error) setMsg(d.error.includes('HTTP') || d.error.includes('fetch') ? `Could not open that address (${d.error}).` : d.error);
+    else if (!d.feeds.length) setMsg('No feed found at that address. Try the feed address itself (often ending in /feed or .xml).');
+    else setFound(d.feeds);
+  }
+  async function follow(f) {
+    const d = await feedsPost('subs', { storyId: story.id, url: f.url, title: f.title });
+    if (d.error) { setMsg(d.error); return; }
+    setSubs(d.subs); setFound(null); setInput('');
+    await fetchNow(true);
+    if (onChanged) onChanged();
+  }
+  async function unfollow(url) { const d = await feedsPost('subs/remove', { storyId: story.id, url }); setSubs(d.subs || []); if (onChanged) onChanged(); }
+  // Read the story's feeds now and put the new items into its headlines straight away.
+  async function fetchNow(quiet) {
+    setBusy('fetch'); if (!quiet) setMsg('');
+    const d = await feedsPost('fetch', { storyId: story.id });
+    setBusy('');
+    if (d.error) { setMsg(d.error); return; }
+    const cur = getCacheEntry(story.id, 'headlines') || {};
+    const have = new Set((cur.items || []).map(i => i.url));
+    const fresh = (d.items || []).filter(i => !have.has(i.url));
+    if (fresh.length) {
+      const merged = [...fresh, ...(cur.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).slice(0, 40);
+      patchCacheEntry(story.id, 'headlines', { items: merged });
+      window.dispatchEvent(new CustomEvent('lateral-headlines-updated', { detail: { storyId: story.id } }));
+    }
+    setMsg(`${fresh.length} new article${fresh.length === 1 ? '' : 's'} added to Latest Headlines${d.errors && d.errors.length ? `; ${d.errors.length} feed${d.errors.length === 1 ? '' : 's'} could not be read` : ''}.`);
+  }
+  async function importOpml(e) {
+    const file = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    const d = await feedsPost('opml', { storyId: story.id, opml: await file.text() });
+    if (d.error) { setMsg(d.error); return; }
+    setSubs(d.subs); setMsg(d.found ? `Found ${d.found} feed${d.found === 1 ? '' : 's'}; ${d.added} added.` : 'No feeds found in that file.');
+    if (d.added) { await fetchNow(true); if (onChanged) onChanged(); }
+  }
+  const ownUrl = token ? `${base.replace(/\/+$/, '')}/api/lateral/feed/${token}/story/${story.id}.xml` : '';
+  const sec = { fontSize:10, fontWeight:800, color:C.textMute, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 };
+  return (
+    <Modal title="Feeds for this story" onClose={onClose} maxWidth={600}>
+      <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.55,marginBottom:12}}>
+        Follow RSS or Atom feeds for <strong>{story.title.replace(' (Prediction)', '')}</strong>: a trusted outlet, a reporter, a court docket, an agency's press page. Their new items join the story's Latest Headlines (and its alerts).
+      </div>
+      <div style={sec}>Following</div>
+      <div style={{marginBottom:14}}>
+        {subs === null && <div style={{fontSize:12,color:C.textMute}}>Loading…</div>}
+        {subs && subs.length === 0 && <div style={{fontSize:12,color:C.textMute}}>No feeds yet.</div>}
+        {(subs || []).map(f => (
+          <div key={f.url} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+            <span style={{color:C.accent,display:'inline-flex'}}><LIcon>{ICONS.rss}</LIcon></span>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.title}</span>
+              <span style={{display:'block',fontSize:10.5,color:C.textMute,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.url}</span>
+            </span>
+            <button onClick={() => unfollow(f.url)} title="Stop following" style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:15,padding:'0 4px'}}>✕</button>
+          </div>
+        ))}
+      </div>
+      <div style={sec}>Add a feed</div>
+      <div style={{display:'flex',gap:8,marginBottom:8}}>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') look(); }} placeholder="A site or feed address, e.g. reuters.com or https://example.com/feed" style={{...inputStyle,flex:1,fontSize:12.5}}/>
+        <Btn onClick={look} disabled={busy === 'look' || !input.trim()} style={{padding:'6px 14px',fontSize:12}}>{busy === 'look' ? 'Looking…' : 'Find feed'}</Btn>
+      </div>
+      {found && found.map(f => (
+        <div key={f.url} style={{padding:'9px 11px',borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,marginBottom:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{f.title} <span style={{fontWeight:500,fontSize:11,color:C.textMute}}>· {f.count} items</span></div>
+              <div style={{fontSize:10.5,color:C.textMute,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.url}</div>
+            </div>
+            <Btn onClick={() => follow(f)} style={{padding:'5px 12px',fontSize:12}}>Follow</Btn>
+          </div>
+          {f.sample.map(i => <div key={i.url} style={{fontSize:11.5,color:C.textMid,marginTop:4,lineHeight:1.4}}>• {i.title}</div>)}
+        </div>
+      ))}
+      <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',margin:'4px 0 12px'}}>
+        <button onClick={() => fileRef.current && fileRef.current.click()} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:700,padding:0}}>Import an OPML file…</button>
+        <input ref={fileRef} type="file" accept=".opml,.xml,text/xml" onChange={importOpml} style={{display:'none'}}/>
+        {subs && subs.length > 0 && <button onClick={() => fetchNow(false)} disabled={busy === 'fetch'} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:700,padding:0}}>{busy === 'fetch' ? 'Reading feeds…' : 'Read the feeds now'}</button>}
+      </div>
+      {msg && <div style={{fontSize:12,color:C.textMid,marginBottom:12,lineHeight:1.45}}>{msg}</div>}
+      {ownUrl && (
+        <>
+          <div style={sec}>Follow this story elsewhere</div>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <input readOnly value={ownUrl} onFocus={e => e.target.select()} style={{...inputStyle,flex:1,fontSize:11.5}}/>
+            <Btn variant="secondary" onClick={() => setMsg(copyText(ownUrl) ? 'Feed address copied.' : 'Select the address and copy it.')} style={{padding:'5px 12px',fontSize:12}}>Copy</Btn>
+          </div>
+          <div style={{fontSize:11,color:C.textMute,marginTop:5}}>An Atom feed of this story's episodes and headlines for your feed reader. The secret in the address is the only password.</div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+// Settings → Feeds: the feeds Lateral offers to your feed reader.
+function FeedsPanel({ stories }) {
+  const [token, setToken] = useState('');
+  const [base, setBase] = useState(window.location.origin);
+  const [fromApp, setFromApp] = useState(false);
+  const [pick, setPick] = useState('');
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    feedsJson('info').then(d => setToken(d.token || ''));
+    alertsJson('config').then(d => { if (d.config && d.config.appUrl) { setBase(d.config.appUrl); setFromApp(true); } });
+  }, []);
+  const root = `${base.replace(/\/+$/, '')}/api/lateral/feed/${token}`;
+  const rows = [
+    ['Activity', 'Everything on your Activity list: prediction moves, resolution dates, new coverage.', `${root}/activity.xml`],
+    ['All stories', 'New articles and episodes across every story you track.', `${root}/stories.xml`],
+  ];
+  const story = (stories || []).find(x => x.id === pick);
+  const copy = url => setMsg(copyText(url) ? 'Copied.' : 'Select the address and copy it.');
+  const line = (title, hint, url) => (
+    <div key={url} style={{padding:'8px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>{title}</div>
+      <div style={{fontSize:11.5,color:C.textMute,margin:'1px 0 5px'}}>{hint}</div>
+      <div style={{display:'flex',gap:8}}>
+        <input readOnly value={url} onFocus={e => e.target.select()} style={{...inputStyle,flex:1,fontSize:11.5}}/>
+        <Btn variant="secondary" onClick={() => copy(url)} style={{padding:'4px 12px',fontSize:12}}>Copy</Btn>
+      </div>
+    </div>
+  );
+  const box = { padding:'10px 12px', borderRadius:8, background:C.surface, border:`1px solid ${C.borderLight}`, marginBottom:14 };
+  const head = { fontSize:10, fontWeight:800, color:C.textMute, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 };
+  return (
+    <div>
+      <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.55,marginBottom:12}}>
+        Subscribe to Lateral from any feed reader (NetNewsWire, Feedly, FreshRSS, Inoreader…). These addresses contain a secret, so keep them private: anyone with the address can read the feed.
+        {!fromApp && <> A reader on another device needs an address it can reach: set <strong>Link back to</strong> under Settings → Alerts.</>}
+      </div>
+      <div style={head}>Your feeds</div>
+      <div style={box}>
+        {token ? rows.map(r => line(...r)) : <div style={{fontSize:12,color:C.textMute}}>Loading…</div>}
+        <div style={{padding:'8px 0'}}>
+          <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>One story</div>
+          <select value={pick} onChange={e => setPick(e.target.value)} style={{...inputStyle,fontSize:12.5,margin:'5px 0'}}>
+            <option value="">Choose a story…</option>
+            {[...(stories || [])].sort((a, b) => a.title.localeCompare(b.title)).map(st => <option key={st.id} value={st.id}>{st.predictionId ? '🔮 ' : ''}{st.title.replace(' (Prediction)', '').slice(0, 70)}</option>)}
+          </select>
+          {story && token && (
+            <div style={{display:'flex',gap:8}}>
+              <input readOnly value={`${root}/story/${story.id}.xml`} onFocus={e => e.target.select()} style={{...inputStyle,flex:1,fontSize:11.5}}/>
+              <Btn variant="secondary" onClick={() => copy(`${root}/story/${story.id}.xml`)} style={{padding:'4px 12px',fontSize:12}}>Copy</Btn>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={head}>Subscribe to everything at once</div>
+      <div style={box}>
+        <div style={{fontSize:12,color:C.textMid,lineHeight:1.5,marginBottom:8}}>An OPML file lists the activity feed, the all-stories feed and one feed per story. Most feed readers can import it.</div>
+        {token && <a href={`${root}/lateral.opml?base=${encodeURIComponent(base.replace(/\/+$/, ''))}`} download="lateral.opml" style={{fontSize:12,fontWeight:700,color:C.accent}}>Download lateral.opml</a>}
+      </div>
+      <div style={head}>Following feeds</div>
+      <div style={{...box,fontSize:12.5,color:C.textMid,lineHeight:1.55}}>
+        To pull someone else's feed <em>into</em> a story, open the story and use <strong>Feeds</strong> in the Latest Headlines bar.
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <button onClick={async () => { if (!window.confirm('Reset the secret? Every feed address above stops working, and readers subscribed to them will need the new ones.')) return; const d = await feedsPost('token/reset'); if (d.token) { setToken(d.token); setMsg('New secret created. The old addresses no longer work.'); } }}
+          style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:'#dc2626',fontSize:11.5,fontWeight:700,padding:'4px 12px'}}>Reset the secret</button>
+        <span style={{fontSize:11.5,color:C.textMid}}>{msg}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Change alerts ────────────────────────────────────────────────────────────
+async function alertsJson(sub, opts) {
+  try {
+    const r = await fetch('/api/lateral/alerts/' + sub, opts);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.error) d.error = `HTTP ${r.status}`;
+    return d;
+  } catch (e) { return { error: e.message }; }
+}
+const alertsPost = (sub, body) => alertsJson(sub, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+const ALERT_KIND = {
+  'prediction-move': { icon: 'trend', color: '#059669', label: 'Prediction' },
+  'prediction-due': { icon: 'clock', color: '#d97706', label: 'Resolution date' },
+  'story-activity': { icon: 'doc', color: '#2563eb', label: 'Story' },
+  system: { icon: 'warn', color: '#dc2626', label: 'Setup' },
+  tavily: { icon: 'coin', color: '#d97706', label: 'Credits' },
+};
+const timeAgo = iso => {
+  const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (m < 1) return 'just now'; if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} hr ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
+// The inbox: everything Lateral noticed, newest first. Works with no delivery channel set up at all.
+function ActivityModal({ onClose, onOpenStory, onOpenSettings, onChanged }) {
+  const [events, setEvents] = useState(null);
+  const load = () => alertsJson('events?limit=100').then(d => setEvents(d.events || []));
+  useEffect(() => { load(); }, []);
+  async function open(e) {
+    if (!e.read) { await alertsPost('read', { ids: [e.id] }); if (onChanged) onChanged(); }
+    if (e.storyId) onOpenStory(e.storyId); else load();
+  }
+  async function markAll() { await alertsPost('read', { all: true }); await load(); if (onChanged) onChanged(); }
+  async function clearAll() { if (!window.confirm('Clear the whole activity list?')) return; await alertsPost('clear'); await load(); if (onChanged) onChanged(); }
+  const unread = (events || []).filter(e => !e.read).length;
+  return (
+    <Modal title="Activity" onClose={onClose} maxWidth={620}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+        <span style={{fontSize:12,color:C.textMute,flex:1}}>{events === null ? 'Loading…' : `${events.length} update${events.length === 1 ? '' : 's'}${unread ? `, ${unread} unread` : ''}`}</span>
+        <button onClick={markAll} disabled={!unread} style={{background:'none',border:'none',cursor:unread ? 'pointer' : 'default',color:unread ? C.accent : C.textMute,fontSize:12,fontWeight:700,padding:0}}>Mark all read</button>
+        <button onClick={onOpenSettings} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:700,padding:0}}>Alert settings</button>
+        <button onClick={clearAll} disabled={!events || !events.length} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12,padding:0}}>Clear</button>
+      </div>
+      {events && events.length === 0 && (
+        <div style={{padding:'28px 8px',textAlign:'center',color:C.textMute,fontSize:13,lineHeight:1.6}}>
+          Nothing yet. Lateral will list it here when a prediction's evidence moves, a resolution date gets close, a story picks up new coverage, or something needs attention.
+          <div style={{marginTop:10}}><button onClick={onOpenSettings} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12.5,fontWeight:700}}>Set up phone or chat alerts →</button></div>
+        </div>
+      )}
+      <div style={{maxHeight:'60vh',overflowY:'auto'}}>
+        {(events || []).map(e => {
+          const k = ALERT_KIND[e.kind] || ALERT_KIND['story-activity'];
+          return (
+            <button key={e.id} onClick={() => open(e)}
+              style={{display:'flex',gap:11,width:'100%',textAlign:'left',padding:'10px 12px',marginBottom:6,borderRadius:9,cursor:'pointer',
+                background:e.read ? C.bg : C.surface,border:`1px solid ${e.read ? C.borderLight : C.border}`,opacity:e.read ? 0.78 : 1}}>
+              <span style={{width:28,height:28,borderRadius:8,background:k.color + '1f',color:k.color,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><LIcon size={15}>{ICONS[k.icon]}</LIcon></span>
+              <span style={{flex:1,minWidth:0}}>
+                <span style={{display:'flex',gap:8,alignItems:'baseline'}}>
+                  <span style={{fontSize:13,fontWeight:e.read ? 600 : 800,color:C.text,lineHeight:1.35,flex:1}}>{e.title}</span>
+                  <span style={{fontSize:10.5,color:C.textMute,flexShrink:0}}>{timeAgo(e.at)}</span>
+                </span>
+                {e.body && <span style={{display:'block',fontSize:12,color:C.textMid,lineHeight:1.5,marginTop:3,whiteSpace:'pre-line'}}>{e.body}</span>}
+                <span style={{display:'block',fontSize:10.5,color:C.textMute,marginTop:4}}>
+                  {k.label}{e.severity === 'important' ? ' · important' : ''}{Array.isArray(e.delivered) ? ` · sent to ${e.delivered.filter(r => r.ok).length} of ${e.delivered.length} channel${e.delivered.length === 1 ? '' : 's'}` : ''}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Modal>
+  );
+}
+
+// Settings → Alerts
+function AlertsPanel() {
+  const [cfg, setCfg] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [saved, setSaved] = useState('');
+  const [tests, setTests] = useState({});
+  const [draft, setDraft] = useState({ type: 'ntfy', name: '', server: 'https://ntfy.sh', topic: '', token: '', url: '' });
+  const [adding, setAdding] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [preview, setPreview] = useState(null);
+  const saveTimer = useRef(null);
+
+  const load = () => { alertsJson('config').then(d => d.config && setCfg(d.config)); alertsJson('status').then(d => !d.error && setStatus(d)); };
+  useEffect(() => {
+    load();
+    // Phone links need an address a phone can reach. If Lateral is being opened from a real address (not localhost), use it.
+    alertsJson('config').then(d => {
+      const host = window.location.hostname;
+      if (d.config && !d.config.appUrl && !/^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host)) {
+        alertsPost('config', { appUrl: window.location.origin }).then(r => { if (r.config) { setCfg(r.config); setSaved('Link address filled in from this page'); setTimeout(() => setSaved(''), 3000); } });
+      }
+    });
+  }, []);
+
+  // Every change saves itself shortly after.
+  const pending = useRef({});
+  const mergeInto = (base, patch) => {
+    const out = { ...base };
+    for (const k of Object.keys(patch)) out[k] = (patch[k] && typeof patch[k] === 'object' && !Array.isArray(patch[k]) && base[k] && typeof base[k] === 'object') ? { ...base[k], ...patch[k] } : patch[k];
+    return out;
+  };
+  function change(patch, immediate) {
+    setCfg(c => mergeInto(c, patch));
+    pending.current = mergeInto(pending.current, patch);
+    clearTimeout(saveTimer.current);
+    const run = async () => {
+      const body = pending.current; pending.current = {};
+      const d = await alertsPost('config', body);
+      if (d.config) { setCfg(d.config); setSaved('Saved'); setTimeout(() => setSaved(''), 1500); load(); }
+    };
+    if (immediate) run(); else saveTimer.current = setTimeout(run, 600);
+  }
+  const channelsForSave = list => list.map(c => ({ id: c.id, type: c.type, name: c.name, enabled: c.enabled, server: c.server }));
+
+  async function addChannel() {
+    const body = { ...draft, name: draft.name || ({ ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook' }[draft.type]) };
+    if (draft.type === 'ntfy' ? !draft.topic.trim() : !/^https?:\/\//i.test(draft.url.trim())) { setMsg(draft.type === 'ntfy' ? 'Enter a topic name.' : 'Enter the full URL, starting with https://'); return; }
+    setMsg('');
+    const d = await alertsPost('config', { channels: [...channelsForSave(cfg.channels), body] });
+    if (d.config) { setCfg(d.config); setAdding(false); setDraft({ type: 'ntfy', name: '', server: 'https://ntfy.sh', topic: '', token: '', url: '' }); load(); }
+  }
+  async function test(id) {
+    setTests(t => ({ ...t, [id]: '…' }));
+    const d = await alertsPost('test', { channelId: id });
+    setTests(t => ({ ...t, [id]: d.ok ? '✓ Sent' : '✗ ' + (d.error || 'failed') }));
+  }
+  async function runNow(sub, label, body) {
+    setMsg(label + '…');
+    const d = await alertsPost(sub, body);
+    if (sub === 'digest' && body && body.preview) setPreview(d);
+    setMsg(d.error ? d.error : sub === 'digest' ? (body && body.preview ? '' : d.sent ? 'Digest sent.' : d.reason || 'Nothing sent.') : sub === 'check' ? `Checked. ${d.newEvents || 0} new update${d.newEvents === 1 ? '' : 's'}.` : sub === 'watch' ? `Started checking ${d.targets} prediction${d.targets === 1 ? '' : 's'}.` : 'Done.');
+    load();
+  }
+
+  if (!cfg) return <div style={{fontSize:13,color:C.textMute}}>Loading…</div>;
+  const box = { padding:'10px 12px', borderRadius:8, background:C.surface, border:`1px solid ${C.borderLight}`, marginBottom:14 };
+  const head = { fontSize:10, fontWeight:800, color:C.textMute, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 };
+  const small = { fontSize:11.5, color:C.textMute, lineHeight:1.5 };
+  const check = (label, checked, onChange, hintText) => (
+    <label style={{display:'flex',alignItems:'flex-start',gap:9,fontSize:12.5,color:C.textMid,lineHeight:1.45,cursor:'pointer',padding:'3px 0'}}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{marginTop:3}}/>
+      <span>{label}{hintText && <span style={{display:'block',...small}}>{hintText}</span>}</span>
+    </label>
+  );
+  const typeLabel = { ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook' };
+
+  return (
+    <div>
+      <div style={{...small,marginBottom:12,fontSize:12.5,color:C.textMid}}>
+        Lateral always lists what it notices in <strong>Activity</strong> (the bell). Add a channel below to also get it on your phone or in chat, even when the app is closed.
+        Alerts are sent from this computer; nothing goes through Lateral's servers (there aren't any).
+      </div>
+
+      <div style={head}>Where to send alerts</div>
+      <div style={box}>
+        {cfg.channels.length === 0 && !adding && <div style={{...small,marginBottom:8}}>No channels yet.</div>}
+        {cfg.channels.map(ch => (
+          <div key={ch.id} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`,flexWrap:'wrap'}}>
+            <input type="checkbox" checked={ch.enabled} title="Send alerts to this channel" onChange={e => change({ channels: channelsForSave(cfg.channels).map(c => c.id === ch.id ? { ...c, enabled: e.target.checked } : c) }, true)}/>
+            <div style={{flex:1,minWidth:140}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>{ch.name} <span style={{fontSize:10.5,fontWeight:700,color:C.accent,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 7px',marginLeft:4}}>{typeLabel[ch.type]}</span></div>
+              <div style={small}>{ch.type === 'ntfy' ? `${ch.server.replace(/^https?:\/\//, '')} · topic ${ch.topicHint}` : ch.urlHint}</div>
+            </div>
+            <button onClick={() => test(ch.id)} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:'3px 10px'}}>Send test</button>
+            {tests[ch.id] && <span style={{fontSize:11.5,color:tests[ch.id].startsWith('✓') ? '#059669' : tests[ch.id] === '…' ? C.textMute : '#dc2626'}}>{tests[ch.id]}</span>}
+            <button onClick={() => { if (window.confirm(`Remove ${ch.name}?`)) change({ channels: channelsForSave(cfg.channels).filter(c => c.id !== ch.id) }, true); }} title="Remove" style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:15,padding:'0 4px'}}>✕</button>
+          </div>
+        ))}
+        {adding ? (
+          <div style={{marginTop:10}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+              <select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}>
+                <option value="ntfy">ntfy (phone push)</option><option value="discord">Discord</option><option value="slack">Slack</option><option value="webhook">Webhook (anything else)</option>
+              </select>
+              <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="Name (optional)" style={{...inputStyle,flex:1,minWidth:120,fontSize:12.5}}/>
+            </div>
+            {draft.type === 'ntfy' ? (
+              <>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <input value={draft.topic} onChange={e => setDraft({ ...draft, topic: e.target.value })} placeholder="Topic, e.g. my-lateral-alerts-8f3k" style={{...inputStyle,flex:1,minWidth:200,fontSize:12.5}}/>
+                  <input value={draft.server} onChange={e => setDraft({ ...draft, server: e.target.value })} placeholder="Server" style={{...inputStyle,flex:1,minWidth:160,fontSize:12.5}}/>
+                </div>
+                <div style={{...small,marginTop:6}}>Install the free ntfy app, subscribe to the same topic, and pick a hard-to-guess name: anyone who knows a public topic can read it. A self-hosted server or access token also works.</div>
+                <input value={draft.token} onChange={e => setDraft({ ...draft, token: e.target.value })} placeholder="Access token (optional, for private servers)" style={{...inputStyle,fontSize:12.5,marginTop:6}}/>
+              </>
+            ) : (
+              <>
+                <input value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} placeholder={draft.type === 'discord' ? 'Discord webhook URL' : draft.type === 'slack' ? 'Slack incoming-webhook URL' : 'https://…'} style={{...inputStyle,fontSize:12.5}}/>
+                <div style={{...small,marginTop:6}}>{draft.type === 'webhook' ? 'Lateral POSTs JSON: app, kind, title, message, url, priority, sentAt. Works with n8n, Home Assistant, Zapier and similar.' : 'Create the webhook in the channel settings, then paste its URL. It is stored only on this computer.'}</div>
+              </>
+            )}
+            <div style={{display:'flex',gap:8,marginTop:10,alignItems:'center'}}>
+              <Btn onClick={addChannel} style={{padding:'6px 12px',fontSize:12}}>Add channel</Btn>
+              <Btn variant="ghost" onClick={() => { setAdding(false); setMsg(''); }} style={{padding:'6px 12px',fontSize:12}}>Cancel</Btn>
+              {msg && <span style={{fontSize:11.5,color:'#dc2626'}}>{msg}</span>}
+            </div>
+          </div>
+        ) : (
+          <Btn variant="secondary" onClick={() => setAdding(true)} style={{padding:'6px 12px',fontSize:12,marginTop:cfg.channels.length ? 10 : 0}}>+ Add a channel</Btn>
+        )}
+      </div>
+
+      <div style={head}>What to tell me</div>
+      <div style={box}>
+        <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>Send straight away</div>
+        {check('A prediction’s evidence moves', cfg.instant.predictionMoves, v => change({ instant: { predictionMoves: v } }), 'The balance changes direction, or shifts by a meaningful amount.')}
+        {check('A prediction’s resolution date is close', cfg.instant.resolutionDue, v => change({ instant: { resolutionDue: v } }), 'A week out, a day out, the day itself, and when it is overdue.')}
+        {check('Something needs attention', cfg.instant.system, v => change({ instant: { system: v } }), 'The local AI, search, or your Tavily key stops working (and when it recovers).')}
+        {check('Tavily credits are running low', cfg.instant.tavilyUsage, v => change({ instant: { tavilyUsage: v } }))}
+        <div style={{height:1,background:C.borderLight,margin:'10px 0'}}/>
+        {check('Send a daily digest', cfg.digest.enabled, v => change({ digest: { enabled: v, tzOffsetMin: new Date().getTimezoneOffset() } }, true), 'One message with everything since the last one, including stories with new coverage. Nothing is sent on quiet days.')}
+        {cfg.digest.enabled && (
+          <div style={{display:'flex',alignItems:'center',gap:10,margin:'6px 0 2px 24px',flexWrap:'wrap'}}>
+            <span style={small}>Around</span>
+            <input type="time" value={cfg.digest.time} onChange={e => change({ digest: { time: e.target.value, tzOffsetMin: new Date().getTimezoneOffset() } })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}/>
+            <button onClick={() => runNow('digest', 'Building preview', { preview: true })} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:0}}>Preview</button>
+            <button onClick={() => runNow('digest', 'Sending digest', {})} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:0}}>Send now</button>
+          </div>
+        )}
+        {preview && (
+          <div style={{margin:'8px 0 2px 24px',padding:'8px 10px',borderRadius:7,background:C.bg,border:`1px solid ${C.borderLight}`}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text}}>{preview.title}</div>
+            <div style={{fontSize:11.5,color:C.textMid,whiteSpace:'pre-line',lineHeight:1.5,marginTop:4}}>{preview.count ? preview.message : 'Nothing new since the last digest.'}</div>
+            <button onClick={() => setPreview(null)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:11,padding:0,marginTop:4}}>Hide</button>
+          </div>
+        )}
+        <div style={{height:1,background:C.borderLight,margin:'10px 0'}}/>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span style={{fontSize:12.5,color:C.textMid}}>Count a prediction as “moved” at</span>
+          <input type="range" min="10" max="40" step="5" value={cfg.sensitivity.scoreDelta} onChange={e => change({ sensitivity: { scoreDelta: Number(e.target.value) } })} style={{width:130}}/>
+          <strong style={{fontSize:12.5,color:C.text}}>{cfg.sensitivity.scoreDelta} points</strong>
+        </div>
+        <div style={small}>A change of direction always counts. Lower numbers mean more alerts.</div>
+      </div>
+
+      <div style={head}>Keep predictions fresh</div>
+      <div style={box}>
+        <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.5,marginBottom:8}}>
+          Predictions only change when their searches run. Let Lateral re-run them on a schedule so alerts can fire while you are away.
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <select value={cfg.watch.hours} onChange={e => change({ watch: { hours: Number(e.target.value) } }, true)} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}>
+            <option value={0}>Off (run them myself)</option><option value={24}>Every day</option><option value={48}>Every 2 days</option><option value={168}>Every week</option>
+          </select>
+          <button onClick={() => runNow('watch', 'Starting')} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:'3px 10px'}}>Run now</button>
+        </div>
+        {status && status.watch && (
+          <div style={{...small,marginTop:8}}>
+            {status.watch.targets} active prediction{status.watch.targets === 1 ? '' : 's'} with searches; each run uses about <strong style={{color:C.textMid}}>{status.watch.creditsPerRun} Tavily credit{status.watch.creditsPerRun === 1 ? '' : 's'}</strong> (one per search).
+            {cfg.watch.hours ? ` That is roughly ${Math.round(status.watch.creditsPerRun * 30 * 24 / cfg.watch.hours)} a month. It pauses on its own if your credits pass 90%.` : ''}
+            {status.watch.lastWatchAt ? ` Last run ${timeAgo(status.watch.lastWatchAt)}.` : ''}
+          </div>
+        )}
+      </div>
+
+      <div style={head}>Links in alerts</div>
+      <div style={box}>
+        <div style={{...small,marginBottom:6}}>So tapping an alert opens the right story, tell Lateral the address you use for it.</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <input value={cfg.appUrl} onChange={e => change({ appUrl: e.target.value })} placeholder={window.location.origin} style={{...inputStyle,flex:1,minWidth:200,fontSize:12.5}}/>
+          <button onClick={() => change({ appUrl: window.location.origin }, true)} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:'3px 10px'}}>Use {window.location.host}</button>
+        </div>
+        <div style={{...small,marginTop:6}}>A phone can only open this if it can reach that address (same Wi-Fi, a VPN, or a tunnel). Leave it empty to send alerts without links.</div>
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <Btn variant="secondary" onClick={() => runNow('check', 'Checking')} style={{padding:'6px 12px',fontSize:12}}>Check for changes now</Btn>
+        <span style={{fontSize:11.5,color:msg.startsWith('Starting') || msg.endsWith('…') ? C.textMute : C.textMid}}>{saved || msg}</span>
+      </div>
+    </div>
+  );
+}
+
 // Settings → Basic: pick a theme from three live previews.
 function ThemePicker() {
   const { theme, setThemeTo } = React.useContext(ThemeContext);
@@ -7618,7 +8604,7 @@ function SetupStatusPanel({ onShowShortcuts }) {
       <div style={head}>Your data</div>
       <div style={box}>
         <div style={{fontSize:12,color:C.textMid,lineHeight:1.5,marginBottom:10}}>
-          Back up your stories, predictions, scored articles and settings to one file, or restore from one. API keys are never included.
+          Back up your stories, predictions, scored articles and settings to one file, or restore from one. API keys are never included. Saved article copies (the Library) are not in this file; copy the <code>data/archive</code> folder to keep them.
         </div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
           <Btn variant="secondary" onClick={downloadBackup} style={{padding:'6px 12px',fontSize:12}}>⬇ Export backup</Btn>
@@ -7652,7 +8638,7 @@ function SetupStatusPanel({ onShowShortcuts }) {
   );
 }
 
-function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavilyUsage, setTavilyUsage, initialTab, onShowShortcuts }) {
+function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavilyUsage, setTavilyUsage, initialTab, onShowShortcuts, stories }) {
   const [f,setF]=useState(settings);
   const [tab,setTab]=useState(initialTab || 'basic');
   const [status,setStatus]=useState('');
@@ -7956,26 +8942,37 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavil
         fontWeight:700,
         borderRadius:8,
         padding:'6px 10px',
-        cursor:'pointer'
+        cursor:'pointer',
+        whiteSpace:'nowrap'
       }}
     >{label}</button>
   );
 
   return (
     <Modal title="Settings" onClose={closeWithSave}>
-      <div style={{display:'flex',gap:8,marginBottom:12}}>
+      <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
         {tabBtn('basic', 'Basic')}
         {tabBtn('search', `Web search${keysLoaded && !keyStatus.hasTavily ? ' ⚠' : ''}`)}
         {tabBtn('models', 'Model setup')}
         {tabBtn('podcasts', 'Podcasts')}
+        {tabBtn('alerts', 'Alerts')}
+        {tabBtn('feeds', 'Feeds')}
         {tabBtn('status', 'Status')}
       </div>
 
+      {tab === 'alerts' && <AlertsPanel/>}
+      {tab === 'feeds' && <FeedsPanel stories={stories}/>}
       {tab === 'status' && <SetupStatusPanel onShowShortcuts={onShowShortcuts}/>}
 
       {tab === 'basic' && (
         <>
           <Field label="Theme"><ThemePicker/></Field>
+          <Field label="Saved copies">
+            <label style={{display:'flex',alignItems:'flex-start',gap:9,fontSize:12.5,color:C.textMid,lineHeight:1.5,cursor:'pointer'}}>
+              <input type="checkbox" checked={f.archiveAuto !== false} onChange={e=>setF({...f,archiveAuto:e.target.checked})} style={{marginTop:3}}/>
+              <span>Keep a readable copy of articles I track (new episodes, and evidence found for predictions), so timelines survive dead links. Copies stay on this computer; find them under <strong>Library</strong>.</span>
+            </label>
+          </Field>
           <Field label="Daily refresh time">
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <input type="time" value={f.refreshTime||'08:00'} onChange={e=>setF({...f,refreshTime:e.target.value})} style={{...inputStyle,width:'auto',flex:'none'}}/>
@@ -11600,7 +12597,10 @@ function App() {
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
   const [aiLoading,setAiLoading]=useState(false);
   const [homeView,setHomeView]=useState(() => !getStoryIdFromUrl());
-  const [activeView, setActiveView] = useState('stories'); // 'stories' | 'predictions'
+  const [activeView, setActiveView] = useState('stories'); // 'stories' | 'predictions' | 'library'
+  const [libKey, setLibKey] = useState(null);      // saved article open in the Library
+  const [libStory, setLibStory] = useState('');     // Library list filter: '' all, '_none' unlinked, or a story id
+  const [libTick, setLibTick] = useState(0);        // bumped when saved articles or their story links change
   const skipNextUrlPushRef = useRef(false);
   const [prefillArticle,setPrefillArticle]=useState(null);
   const [cacheVer,setCacheVer]=useState(0); // bumped after server cache hydration → triggers re-render
@@ -11677,13 +12677,14 @@ function App() {
     const payload = {
       location: String(settings?.location || '').trim(),
       autoRefreshHours: Number(settings?.autoRefreshHours ?? DEF_SETTINGS.autoRefreshHours),
+      archiveAuto: settings?.archiveAuto !== false,
     };
     fetch('/api/lateral/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }).catch(() => {});
-  }, [settings?.location, settings?.autoRefreshHours]);
+  }, [settings?.location, settings?.autoRefreshHours, settings?.archiveAuto]);
 
   // ── Auto-refresh at daily pivot time ────────────────────────────────────────
   // Fires a 'lateral-refresh' event exactly when isCacheStale flips to true,
@@ -11739,6 +12740,20 @@ function App() {
   }, []);
   const healthProblem = health && health.overall === 'fail' ? health.checks.find(c => c.status === 'fail') : null;
   const openSettings = (tab) => { setSettingsTab(tab || null); setModal('settings'); };
+  // Alerts: unread count for the bell, refreshed every minute and whenever the window regains focus.
+  const [alertsUnread, setAlertsUnread] = useState({ unread: 0, important: 0 });
+  const refreshAlerts = () => alertsJson('unread').then(d => { if (!d.error) setAlertsUnread({ unread: d.unread || 0, important: d.important || 0 }); });
+  useEffect(() => {
+    refreshAlerts();
+    const t = setInterval(refreshAlerts, 60000);
+    const onVis = () => { if (!document.hidden) refreshAlerts(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, []);
+  const openStoryById = (id) => { const st = storiesView.find(x => x.id === id); setActiveView(st && st.predictionId ? 'predictions' : 'stories'); setSelStory(id); setSelEp(null); setHomeView(false); setModal(null); };
+
+  // Open the Library (optionally filtered to one tracked story's saved articles).
+  const openLibrary = (storyId) => { setActiveView('library'); setLeftPanelOpen(true); setLibKey(null); if (typeof storyId === 'string') setLibStory(storyId); setModal(null); };
 
   // Keyboard shortcuts. Ignored while typing in a field or when a modifier key is held.
   useEffect(() => {
@@ -11757,6 +12772,8 @@ function App() {
         case 'h': setHomeView(true); setSelStory(null); setSelEp(null); break;
         case 'n': e.preventDefault(); setModal('addStory'); break;
         case 'p': e.preventDefault(); setModal('addPrediction'); break;
+        case 'l': e.preventDefault(); openLibrary(); break;
+        case 'a': e.preventDefault(); setModal('activity'); break;
         case ',': e.preventDefault(); openSettings(); break;
         case 't': toggleTheme(); break;
         case '?': e.preventDefault(); setModal(modal === 'shortcuts' ? null : 'shortcuts'); break;
@@ -11766,6 +12783,26 @@ function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  // "Saved copy" buttons elsewhere (e.g. on an episode) ask the Library to open one article.
+  useEffect(() => {
+    const h = (e) => { openLibrary(); setLibKey(e.detail && e.detail.key ? e.detail.key : null); };
+    window.addEventListener('lateral-open-library', h);
+    return () => window.removeEventListener('lateral-open-library', h);
+  });
+
+  // Keep a saved copy of each source article as episodes are added. The first pass after load only records what already
+  // exists (use Library → "Save everything I already track" for those), so opening the app never triggers a surprise batch.
+  const archSeenRef = useRef(null);
+  useEffect(() => {
+    if (!serverReady) return;
+    const eps = [];
+    (data.stories || []).forEach(s => (s.episodes || []).forEach(e => { if (e.sourceUrl && /^https?:\/\//i.test(e.sourceUrl)) eps.push({ url: e.sourceUrl, title: e.headline || '', storyId: s.id }); }));
+    if (archSeenRef.current === null) { archSeenRef.current = new Set(eps.map(x => x.url)); return; }
+    const fresh = eps.filter(x => !archSeenRef.current.has(x.url));
+    fresh.forEach(x => archSeenRef.current.add(x.url));
+    if (fresh.length && settings?.archiveAuto !== false) archivePost('queue', { articles: fresh.slice(0, 50) });
+  }, [data.stories, serverReady]);
 
   // On mount: sync with server.
   // Sets serverSyncReady=true BEFORE calling setData so the triggered save()
@@ -12304,34 +13341,17 @@ function App() {
             )}
           </div>
           {!isMobile && storiesView.some(s=>s.episodes?.length>0) && (
-            <div style={{display:'flex',alignItems:'center',gap:12,flexShrink:0,marginRight:10}}>
-            <button
-              onClick={refreshAllHeadlines}
-              disabled={refreshingHL}
-              title={refreshingHL ? `Refreshing ${refreshHLProg?.i||0}/${refreshHLProg?.total||0}: ${refreshHLProg?.title||''}` : 'Refresh headlines for all active stories'}
-              style={{padding:'5px 13px',borderRadius:7,background: refreshHLDone ? '#166534' : refreshingHL ? '#78350f' : '#92400e',color:'#fde68a',border:`1.5px solid ${refreshHLDone ? '#22c55e' : refreshingHL ? '#d97706' : '#f59e0b'}`,fontSize:12,fontWeight:700,cursor: refreshingHL ? 'default' : 'pointer',letterSpacing:'0.02em',flexShrink:0,transition:'all 0.3s',opacity: refreshingHL ? 0.8 : 1}}>
-              {refreshHLDone ? '✓ Refreshed' : refreshingHL ? `↻ ${refreshHLProg?.i||0}/${refreshHLProg?.total||0}` : '↻ Headlines'}
-            </button>
-            <button onClick={()=>setModal('brief')} title={briefNudge ? 'New coverage detected since your last brief — click to regenerate' : 'Open Intelligence Brief'}
-              style={{position:'relative',padding:'5px 13px',borderRadius:7,background:C.surface,color:C.accent,border:`1.5px solid ${C.accent}`,fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',flexShrink:0,transition:'all 0.15s'}}>
-              Brief
-              {briefNudge && (
-                <span style={{position:'absolute',top:-3,right:-3,width:8,height:8,borderRadius:'50%',background:'#f59e0b',border:'1.5px solid '+C.surface,boxShadow:'0 0 0 1px #f59e0b'}}/>
-              )}
-            </button>
-            {NOTEBOOKLM_EXPORT_ENABLED && (
-              <button onClick={()=>setModal('notebooklm')} title="Export selected stories as NotebookLM-ready plain-text bundle"
-                style={{padding:'5px 13px',borderRadius:7,background:C.surface,color:'#0f766e',border:'1.5px solid #0f766e',fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',flexShrink:0,transition:'all 0.15s'}}>
-                NotebookLM
-              </button>
-            )}
-            <button onClick={()=>setModal('map')} title="Spider Map — visualize story connections"
-              style={{padding:'5px 13px',borderRadius:7,background:C.surface,color:'#7c3aed',border:'1.5px solid #7c3aed',fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',flexShrink:0,transition:'all 0.15s'}}>
-              ⬡ Map
-            </button>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginRight:8}}>
+              <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('notebooklm')}
+                onMap={()=>setModal('map')}/>
             </div>
           )}
-          <button onClick={()=>setModal('settings')} title="Settings" style={{border:'none',background:'none',fontSize:17,cursor:'pointer',color:C.textMute,padding:'4px 8px',borderRadius:6,flexShrink:0}}>⚙</button>
+          <button className="tb-icon" onClick={()=>setModal('activity')} title={alertsUnread.unread ? `Activity: ${alertsUnread.unread} unread (press a)` : 'Activity (press a)'} style={{position:'relative'}}>
+            <LIcon size={18}>{ICONS.bell}</LIcon>
+            {alertsUnread.unread > 0 && <span style={{position:'absolute',top:3,right:2,minWidth:15,height:15,padding:'0 4px',borderRadius:8,background:alertsUnread.important ? '#dc2626' : 'var(--accent)',color:'#fff',fontSize:9.5,fontWeight:800,lineHeight:'15px',textAlign:'center',boxSizing:'border-box'}}>{alertsUnread.unread > 9 ? '9+' : alertsUnread.unread}</span>}
+          </button>
+          <button className="tb-icon" onClick={()=>setModal('settings')} title="Settings (press ,)"><LIcon size={18}>{ICONS.gear}</LIcon></button>
           {isMobile && (
             <button
               onClick={()=>setMobileRightPanelOpen(true)}
@@ -12343,37 +13363,14 @@ function App() {
               </svg>
             </button>
           )}
-          <button onClick={toggleTheme} title={`Theme: ${themeById(theme).label} — click for ${THEMES[(THEMES.findIndex(t => t.id === theme) + 1) % THEMES.length].label} (or press t)`} style={{border:'none',background:'none',fontSize:16,cursor:'pointer',color:C.textMute,padding:'4px 8px',borderRadius:6,flexShrink:0}}>{themeById(theme).icon}</button>
+          <button className="tb-icon" onClick={toggleTheme} title={`Theme: ${themeById(theme).label} — click for ${THEMES[(THEMES.findIndex(t => t.id === theme) + 1) % THEMES.length].label} (or press t)`}>{themeById(theme).icon}</button>
         </div>
         {isMobile && (
           <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:4}}>
             {storiesView.some(s=>s.episodes?.length>0) && (
-              <>
-                <button
-                  onClick={refreshAllHeadlines}
-                  disabled={refreshingHL}
-                  title={refreshingHL ? `Refreshing ${refreshHLProg?.i||0}/${refreshHLProg?.total||0}: ${refreshHLProg?.title||''}` : 'Refresh headlines for all active stories'}
-                  style={{padding:'5px 13px',borderRadius:7,background: refreshHLDone ? '#166534' : refreshingHL ? '#78350f' : '#92400e',color:'#fde68a',border:`1.5px solid ${refreshHLDone ? '#22c55e' : refreshingHL ? '#d97706' : '#f59e0b'}`,fontSize:12,fontWeight:700,cursor: refreshingHL ? 'default' : 'pointer',letterSpacing:'0.02em',transition:'all 0.3s',opacity: refreshingHL ? 0.8 : 1}}>
-                  {refreshHLDone ? '✓ Refreshed' : refreshingHL ? `↻ ${refreshHLProg?.i||0}/${refreshHLProg?.total||0}` : '↻ Headlines'}
-                </button>
-                <button onClick={()=>setModal('brief')} title={briefNudge ? 'New coverage detected since your last brief — click to regenerate' : 'Open Intelligence Brief'}
-                  style={{position:'relative',padding:'5px 13px',borderRadius:7,background:C.surface,color:C.accent,border:`1.5px solid ${C.accent}`,fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',transition:'all 0.15s'}}>
-                  Brief
-                  {briefNudge && (
-                    <span style={{position:'absolute',top:-3,right:-3,width:8,height:8,borderRadius:'50%',background:'#f59e0b',border:'1.5px solid '+C.surface,boxShadow:'0 0 0 1px #f59e0b'}}/>
-                  )}
-                </button>
-                {NOTEBOOKLM_EXPORT_ENABLED && (
-                  <button onClick={()=>setModal('notebooklm')} title="Export selected stories as NotebookLM-ready plain-text bundle"
-                    style={{padding:'5px 13px',borderRadius:7,background:C.surface,color:'#0f766e',border:'1.5px solid #0f766e',fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',transition:'all 0.15s'}}>
-                    NotebookLM
-                  </button>
-                )}
-                <button onClick={()=>setModal('map')} title="Spider Map — visualize story connections"
-                  style={{padding:'5px 13px',borderRadius:7,background:C.surface,color:'#7c3aed',border:'1.5px solid #7c3aed',fontSize:12,fontWeight:700,cursor:'pointer',letterSpacing:'0.02em',transition:'all 0.15s'}}>
-                  ⬡ Map
-                </button>
-              </>
+              <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('notebooklm')}
+                onMap={()=>setModal('map')}/>
             )}
           </div>
         )}
@@ -12416,6 +13413,7 @@ function App() {
             onClose={()=>setLeftPanelOpen(false)}
             activeView={activeView}
             onViewChange={setActiveView}
+            libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>}
           />
         )}
         {isMobile && (
@@ -12433,13 +13431,16 @@ function App() {
               onClose={()=>setLeftPanelOpen(false)}
               activeView={activeView}
               onViewChange={setActiveView}
+              libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>}
             />
           </MobileDrawer>
         )}
         <div style={{flex:1,minWidth:0,display:'flex',overflow:'hidden'}}>
-          {homeView
+          {activeView==='library'
+            ? <LibraryCenter keyId={libKey} stories={storiesView} onSelectKey={setLibKey} onFilterStory={setLibStory} onOpenStory={id=>{const st=storiesView.find(x=>x.id===id); setActiveView(st&&st.predictionId?'predictions':'stories'); setSelStory(id); setSelEp(null); setHomeView(false);}} onChanged={()=>setLibTick(t=>t+1)} tick={libTick}/>
+            : homeView
             ? <HomePanel stories={storiesView} settings={settings} serverReady={serverReady} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}} onAddEpisode={addEpisodeFromCard} onSelectStory={id=>{setSelStory(id);setHomeView(false);}} refreshing={refreshingHL} refreshProg={refreshHLProg} refreshDone={refreshHLDone} refreshLog={refreshLog}/>
-            : <CenterPanel story={story} selEpId={selEp} onSelEp={id=>setSelEp(id)} onAddEp={()=>setModal('addEpisode')} onDiscover={()=>setModal('discover')} onRegen={handleRegen} aiLoading={aiLoading} onDeleteEp={deleteEpisode} settings={settings} onAddFromHeadline={addEpisodeFromHeadline} onAddPodcast={addEpisodeFromPodcast} onStoryRefreshed={touchStoryUpdatedAt} onSaveBriefAsEpisode={addEpisodeFromBrief} onBackfill={()=>setModal('backfill')} onUpdateStory={updateStory}/>
+            : <CenterPanel onOpenLibrary={openLibrary} story={story} selEpId={selEp} onSelEp={id=>setSelEp(id)} onAddEp={()=>setModal('addEpisode')} onDiscover={()=>setModal('discover')} onRegen={handleRegen} aiLoading={aiLoading} onDeleteEp={deleteEpisode} settings={settings} onAddFromHeadline={addEpisodeFromHeadline} onAddPodcast={addEpisodeFromPodcast} onStoryRefreshed={touchStoryUpdatedAt} onSaveBriefAsEpisode={addEpisodeFromBrief} onBackfill={()=>setModal('backfill')} onUpdateStory={updateStory}/>
           }
         </div>
         {!isMobile && (
@@ -12457,10 +13458,11 @@ function App() {
       {modal==='addEpisode' && story && <AddEpisodeModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='backfill'   && story && <BackfillModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='discover'   && story && <DiscoverModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
-      {modal==='settings'   && <SettingsModal settings={settings} onSave={setSettings} onClose={()=>{setModal(null);setSettingsTab(null);}}onPurgeDeletedStories={purgeDeletedStories} tavilyUsage={tavilyUsage} setTavilyUsage={setTavilyUsage} initialTab={settingsTab} onShowShortcuts={()=>setModal('shortcuts')}/>}
+      {modal==='settings'   && <SettingsModal settings={settings} onSave={setSettings} onClose={()=>{setModal(null);setSettingsTab(null);}}onPurgeDeletedStories={purgeDeletedStories} tavilyUsage={tavilyUsage} setTavilyUsage={setTavilyUsage} initialTab={settingsTab} onShowShortcuts={()=>setModal('shortcuts')} stories={storiesView}/>}
+      {modal==='activity'   && <ActivityModal onClose={()=>{setModal(null);refreshAlerts();}} onOpenStory={openStoryById} onOpenSettings={()=>openSettings('alerts')} onChanged={refreshAlerts}/>}
       {modal==='shortcuts'  && (
         <Modal title="Keyboard shortcuts" onClose={()=>setModal(null)} maxWidth={420}>
-          {[['/','Search the news'],['h','Home'],['n','New story'],['p','New prediction'],[',','Settings'],['t','Switch theme'],['?','This list'],['Esc','Close a window']].map(([k,d]) => (
+          {[['/','Search the news'],['h','Home'],['n','New story'],['p','New prediction'],['l','Library (saved articles)'],['a','Activity and alerts'],[',','Settings'],['t','Switch theme'],['?','This list'],['Esc','Close a window']].map(([k,d]) => (
             <div key={k} style={{display:'flex',alignItems:'center',gap:14,padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`}}>
               <kbd style={{minWidth:34,textAlign:'center',padding:'2px 8px',borderRadius:5,border:`1px solid ${C.border}`,background:C.surface,color:C.text,fontSize:12,fontWeight:700,fontFamily:'inherit'}}>{k}</kbd>
               <span style={{fontSize:13,color:C.text}}>{d}</span>
