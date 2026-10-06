@@ -370,6 +370,35 @@ function handlePredictionGet(reqUrl, res) {
   send(res, 200, { prediction: p, items, evidence: computeEvidence(links) });
 }
 
+// GET /v2/calibration — track record across resolved predictions.
+// "Evidence" is judged on whether the balance leaned the way things turned out (only clear leans count);
+// "confidence" on whether your own stated percentage was on the right side of 50%.
+function handleCalibration(res) {
+  const resolved = readV2().predictions.filter(p => p.resolution && (p.resolution.outcome === 'yes' || p.resolution.outcome === 'no'));
+  const evidence = { right: 0, wrong: 0, unclear: 0 };
+  const confidence = { right: 0, wrong: 0, even: 0 };
+  let brierSum = 0;
+  const items = resolved.map(p => {
+    const r = p.resolution, happened = r.outcome === 'yes';
+    let evidenceCall = 'unclear';
+    if (r.direction === 'closer') evidenceCall = happened ? 'right' : 'wrong';
+    else if (r.direction === 'further') evidenceCall = happened ? 'wrong' : 'right';
+    evidence[evidenceCall]++;
+    const conf = Number(r.confidence ?? p.confidence);
+    let confidenceCall = 'even';
+    if (conf > 50) confidenceCall = happened ? 'right' : 'wrong';
+    else if (conf < 50) confidenceCall = happened ? 'wrong' : 'right';
+    confidence[confidenceCall]++;
+    brierSum += Math.pow(conf / 100 - (happened ? 1 : 0), 2);
+    return { id: p.id, statement: p.statement, outcome: r.outcome, resolvedAt: r.resolvedAt, confidence: conf, balance: r.balance, direction: r.direction, evidenceCall, confidenceCall };
+  });
+  send(res, 200, {
+    resolved: resolved.length, evidence, confidence,
+    brier: resolved.length ? Math.round((brierSum / resolved.length) * 1000) / 1000 : null, // 0 = perfect, 0.25 = always saying 50%
+    items: items.sort((a, b) => String(b.resolvedAt).localeCompare(String(a.resolvedAt))),
+  });
+}
+
 function handlePredictionPatch(req, reqUrl, res) {
   const id = require('path').basename(reqUrl.pathname);
   let chunks = [];
@@ -384,6 +413,23 @@ function handlePredictionPatch(req, reqUrl, res) {
       if (body.statement !== undefined) p.statement = String(body.statement).trim();
       if (body.status !== undefined) p.status = body.status;
       if (body.confidence !== undefined) p.confidence = Number(body.confidence);
+      if (body.resolutionDate !== undefined) p.resolutionDate = body.resolutionDate || null;
+      // Record how it turned out ('yes' | 'no'), or reopen it (null). The evidence reading at that moment is
+      // frozen alongside the outcome so calibration can later compare "which way the news leaned" to what happened.
+      if (body.outcome !== undefined) {
+        if (body.outcome === 'yes' || body.outcome === 'no') {
+          const ev = computeEvidence(v2.links.filter(l => l.predictionId === id));
+          p.resolution = {
+            outcome: body.outcome, resolvedAt: nowIso(),
+            balance: ev.score, direction: ev.direction, strength: ev.strength,
+            supports: ev.supports, contradicts: ev.contradicts, confidence: p.confidence,
+          };
+          p.status = 'resolved';
+        } else if (body.outcome === null) {
+          delete p.resolution;
+          p.status = 'active';
+        } else return send(res, 400, { error: "outcome must be 'yes', 'no' or null" });
+      }
       if (Array.isArray(body.signals)) {
         p.signals = body.signals.map(s => ({
           id: s.id || uuid(), query: String(s.query || '').trim(),
@@ -577,6 +623,7 @@ function route(req, reqUrl, res, llmConfig) {
 
   // Predictions
   if (pathname === '/v2/predictions' && req.method === 'GET') return handlePredictionsList(res);
+  if (pathname === '/v2/calibration' && req.method === 'GET') return handleCalibration(res);
   if (pathname === '/v2/predictions' && req.method === 'POST') return handlePredictionCreate(req, res);
   if (pathname.startsWith('/v2/predictions/') && pathname.endsWith('/search/status') && req.method === 'GET') {
     return handleSearchStatus(reqUrl, res);

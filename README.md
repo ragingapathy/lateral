@@ -10,7 +10,7 @@ for the AI parts; cloud LLM providers are optional.
 
 ![The home overview in the Midnight theme: status cards, a breakdown of every tracked story, and a feed of the latest coverage](screenshots/overview-midnight.webp)
 
-*The home overview (Midnight theme): every tracked story at a glance, with the latest coverage for each below. Lateral also has a light theme; switch with the sun/moon icon.*
+*The home overview (Midnight theme): every tracked story at a glance, with the latest coverage for each below. Lateral has three themes (Beige, Ledger and Midnight); pick one in Settings → Basic, or press `t` to cycle.*
 
 ![A story page: an episode timeline, the latest headlines, and video, podcast and social context](screenshots/story-view.webp)
 
@@ -26,6 +26,12 @@ for the AI parts; cloud LLM providers are optional.
 - **Predictions** — write a falsifiable claim, attach *signals* (searches that watch for evidence), and Lateral finds articles and
   scores each as supporting, contradicting, complicating, or irrelevant. You can override any call. The **evidence balance** shows
   which way the news leans; it is *not* a probability and it never changes your own confidence.
+- **Track record** — when a prediction settles, record whether it happened. Lateral keeps score of whether the evidence balance
+  leaned the right way (only clear leans count) and whether your own confidence was on the right side, with a Brier score. Treat it
+  as an anecdote until you have ten or more.
+- **Setup check and backups** — **Settings → Status** shows whether Ollama, your models, Tavily and news search are working, with the
+  fix next to anything that isn't. The same screen exports your data to one file and restores it. API keys are never included.
+- **Keyboard shortcuts** — `/` search, `h` home, `n` new story, `p` new prediction, `,` settings, `t` theme, `?` for the list.
 - **Article images that actually load** — many news results arrive as opaque Google News links. Lateral resolves them to the real
   article, reads the page, recovers bot-blocked pages with Tavily, and runs every candidate past a small vision model so logos,
   tiny thumbnails and unrelated images are rejected. Anything left shows a clean fallback card.
@@ -118,6 +124,9 @@ The proxy exposes a plain JSON API, so scripts and other tools can drive Lateral
 | `POST /v2/links/:id/review` · `/score` | Override a stance by hand, or have the model score it again. |
 | `POST /v2/items` | Add an article as evidence, optionally linked to a prediction with a stance. |
 | `POST /api/lateral/relevance/check` · `/relevance/override` | Relevance judge, and "restore" overrides. |
+| `GET /v2/calibration` | Track record across resolved predictions. Set an outcome with `PATCH /v2/predictions/:id` and `{"outcome":"yes"}`, `"no"` or `null` to reopen. |
+| `GET /api/lateral/health/check` | Setup check: Ollama, models, Tavily key, news search, data folder. |
+| `GET /api/lateral/backup` · `POST /api/lateral/restore` | Export your data as one JSON bundle, or restore one (`{"bundle": …, "dryRun": true}` previews without writing). |
 | `POST /api/lateral/images/resolve` · `GET /api/lateral/images/stats` | Image pipeline, and its counters. |
 
 Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, reqUrl, res, ctx)` to add private endpoints.
@@ -157,6 +166,7 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
   balance, and share pages that include the tracked evidence.
 - The relevance filter and its reviewable "Filtered out" lists (Home Discovery, story Headlines, Discover modal).
 - The image pipeline: Google News link resolution, image validation, vision judging, Tavily Extract recovery, and a fallback card.
+- Prediction outcomes with a track record, a Settings → Status setup check, data export/import, and keyboard shortcuts.
 - A **Web search** tab in Settings to save and test the Tavily key.
 - A standalone `docker-compose.yml` stack.
 

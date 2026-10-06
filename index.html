@@ -6,7 +6,7 @@
   <title>Lateral — Narrative Memory</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -36,7 +36,23 @@
       --accent: #a78bfa;
       --accent-light: #2d2445;
     }
-    
+
+    /* Ledger: a grey-green "bookkeeper's ledger" light theme (palette from the Quaere visual direction). */
+    [data-theme="ledger"] {
+      --bg: #cbdccb;
+      --surface: #f5f9f5;
+      --border: #a9bfac;
+      --border-light: #e3ede3;
+      --text: #1e2a22;
+      --text-mid: #3e5043;
+      --text-mute: #47594a;
+      --accent: #2b6b4a;
+      --accent-light: #cfe3d1;
+    }
+    [data-theme="ledger"] body { font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    /* Headings that use the serif display face pick up Libre Caslon in this theme. */
+    [data-theme="ledger"] [style*="Playfair Display"] { font-family: 'Libre Caslon Text', Georgia, serif !important; }
+
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; transition: background 0.3s; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -200,6 +216,14 @@ const MOBILE_BREAKPOINT = 900;
 
 const BEIGE = { bg:'#f5f3ef', surface:'#ffffff', border:'#e8e4de', borderLight:'#f0ede8', text:'#1a1714', textMid:'#4b4540', textMute:'#9a948d', accent:'#b86b4a' };
 const MIDNIGHT = { bg:'#0f0a1e', surface:'#1a142e', border:'#2d2445', borderLight:'#3d3058', text:'#e8e4f0', textMid:'#b8b0d0', textMute:'#7a7090', accent:'#a78bfa' };
+const LEDGER = { bg:'#cbdccb', surface:'#f5f9f5', border:'#a9bfac', borderLight:'#e3ede3', text:'#1e2a22', textMid:'#3e5043', textMute:'#47594a', accent:'#2b6b4a' };
+// The three themes, in the order the toggle cycles through them.
+const THEMES = [
+  { id:'beige',    label:'Beige',    sub:'Warm paper',            icon:'☀️', colors:BEIGE },
+  { id:'ledger',   label:'Ledger',   sub:'Grey-green bookkeeper', icon:'📒', colors:LEDGER },
+  { id:'midnight', label:'Midnight', sub:'Dark violet',           icon:'🌙', colors:MIDNIGHT },
+];
+const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
 
 const EP = {
   seed:          { label: 'Seed',          color: '#2563eb', light: '#dbeafe', symbol: '◉' },
@@ -1704,6 +1728,17 @@ async function fetchJsonFirstOk(urls, options = {}) {
   return { ok: false, status: lastStatus, error: lastErr };
 }
 
+async function fetchTavilyUsageRaw() {
+  try {
+    const r = await fetch('/api/lateral/tavily/usage');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+    return { ...d, checkedAt: Date.now() };
+  } catch (e) {
+    return { configured: false, error: e.message };
+  }
+}
+
 async function startIntelligenceJob(payload) {
   const tried = await fetchJsonFirstOk(
     intelligenceEndpointCandidates('/intelligence/start'),
@@ -1936,6 +1971,7 @@ async function fetchTavilySocial(query, domains, limit = 8) {
     const r = await fetch(`/api/lateral/tavily-social?${params.toString()}`);
     if (!r.ok) return [];
     const data = await r.json();
+    window.dispatchEvent(new CustomEvent('lateral-tavily-spent'));
     return (Array.isArray(data.results) ? data.results : []).map(x => ({
       title: String(x.title || '').trim(),
       snippet: String(x.content || '').slice(0, 280),
@@ -3013,7 +3049,7 @@ function Dot({ status }) {
 
 function Tag({ children, color, bg }) {
   const { theme } = React.useContext(ThemeContext);
-  const fallbackBg = theme === 'midnight' ? '#ede9fe' : '#f0ede8';
+  const fallbackBg = theme === 'midnight' ? '#ede9fe' : theme === 'ledger' ? '#e3ede3' : '#f0ede8';
   const fallbackColor = theme === 'midnight' ? '#4c1d95' : C.textMid;
   return <span style={{padding:'2px 8px',borderRadius:5,background:bg||fallbackBg,color:color||fallbackColor,fontSize:11,fontWeight:600}}>{children}</span>;
 }
@@ -3024,7 +3060,7 @@ function CompactPillCloud({ items, maxVisible = 3, moreLabel = 'more tags', gap 
   const list = (items || []).filter(Boolean);
   const hiddenCount = Math.max(0, list.length - maxVisible);
   const visibleItems = expanded ? list : list.slice(0, maxVisible);
-  const pillBg = theme === 'midnight' ? '#ede9fe' : '#f0ede8';
+  const pillBg = theme === 'midnight' ? '#ede9fe' : theme === 'ledger' ? '#e3ede3' : '#f0ede8';
   const pillText = theme === 'midnight' ? '#4c1d95' : C.textMid;
 
   useEffect(() => { setExpanded(false); }, [list.join('|')]);
@@ -5340,6 +5376,81 @@ function PredictionLinkCard({ link, color, busy, onSetStance, onRescore }) {
   );
 }
 
+// Record how a prediction turned out, and show the running track record: did the evidence balance lean the way
+// things actually went, and was your own confidence on the right side?
+function OutcomePanel({ prediction, pid, HL, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [cal, setCal] = useState(null);
+  const res = prediction?.resolution;
+  const loadCal = () => fetch('/v2/calibration').then(r => r.ok ? r.json() : null).then(d => { if (d) setCal(d); }).catch(() => {});
+  useEffect(() => { loadCal(); }, [pid, res?.outcome]);
+
+  async function setOutcome(outcome) {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch(`/v2/predictions/${pid}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ outcome }) });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || 'Could not save the outcome');
+      await onChanged();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
+  const happened = res?.outcome === 'yes';
+  const leaned = res ? ({ closer:'toward TRUE', further:'toward FALSE', mixed:'both ways', none:'neither way (no evidence)' }[res.direction] || 'neither way') : '';
+  const evCall = !res ? '' : res.direction === 'closer' ? (happened ? 'right' : 'wrong') : res.direction === 'further' ? (happened ? 'wrong' : 'right') : 'unclear';
+  const confCall = !res ? '' : res.confidence > 50 ? (happened ? 'right' : 'wrong') : res.confidence < 50 ? (happened ? 'wrong' : 'right') : 'even';
+  const tone = { right:'#059669', wrong:'#dc2626', unclear:C.textMute, even:C.textMute };
+  const clear = cal ? cal.evidence.right + cal.evidence.wrong : 0;
+
+  return (
+    <div style={{marginBottom:20}}>
+      <div style={{...HL}}>Outcome &amp; track record</div>
+      <div style={{padding:'12px 14px',borderRadius:8,background:C.surface,border:`1px solid ${C.borderLight}`}}>
+        {!res ? (
+          <>
+            <div style={{fontSize:12,color:C.textMute,lineHeight:1.5,marginBottom:10}}>
+              When this is settled, record what happened. Lateral will keep score of whether the evidence leaned the right way, and whether your confidence did.
+            </div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <Btn variant="secondary" onClick={() => setOutcome('yes')} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>✓ It happened</Btn>
+              <Btn variant="secondary" onClick={() => setOutcome('no')} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>✗ It didn’t happen</Btn>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:6}}>
+              {happened ? '✓ It happened' : '✗ It didn’t happen'}
+              <span style={{fontWeight:400,fontSize:11,color:C.textMute}}> · recorded {new Date(res.resolvedAt).toLocaleDateString()}</span>
+            </div>
+            <div style={{fontSize:12,color:C.text,lineHeight:1.6}}>
+              The evidence leaned <strong>{leaned}</strong>{res.direction === 'closer' || res.direction === 'further' ? ` (${res.balance > 0 ? '+' : ''}${res.balance})` : ''}
+              {' — '}<strong style={{color:tone[evCall]}}>{evCall === 'unclear' ? 'not a clear lean, so it doesn’t count' : evCall === 'right' ? 'it pointed the right way' : 'it pointed the wrong way'}</strong>.
+              <br/>
+              Your confidence of {res.confidence}% was <strong style={{color:tone[confCall]}}>{confCall === 'even' ? 'exactly 50% (no call)' : confCall === 'right' ? 'on the right side' : 'on the wrong side'}</strong>.
+            </div>
+            <div style={{marginTop:10}}>
+              <button onClick={() => setOutcome(null)} disabled={busy} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:11,fontWeight:700,padding:0}}>↺ Reopen</button>
+            </div>
+          </>
+        )}
+        {err && <div style={{marginTop:8,fontSize:11,color:'#dc2626'}}>{err}</div>}
+        {cal && cal.resolved > 0 && (
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${C.borderLight}`,fontSize:11.5,color:C.textMid,lineHeight:1.6}}>
+            <strong style={{color:C.text}}>Track record · {cal.resolved} resolved</strong><br/>
+            Evidence leaned the right way in {cal.evidence.right} of {clear} clear call{clear === 1 ? '' : 's'}
+            {cal.evidence.unclear ? ` (${cal.evidence.unclear} had no clear lean)` : ''}.<br/>
+            Your confidence was on the right side in {cal.confidence.right} of {cal.confidence.right + cal.confidence.wrong}
+            {cal.brier !== null ? ` · Brier score ${cal.brier} (0 is perfect; 0.25 is always saying 50%)` : ''}.
+            {cal.resolved < 10 && <div style={{marginTop:4,fontStyle:'italic',color:C.textMute}}>Small sample: treat this as an anecdote until you have 10 or more.</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PredictionCenterView({ story }) {
   const [prediction, setPrediction] = useState(null);
   const [links, setLinks] = useState([]);
@@ -5553,6 +5664,8 @@ function PredictionCenterView({ story }) {
             </div>
           </div>
         )}
+
+        <OutcomePanel prediction={prediction} pid={pid} HL={HL} onChanged={loadAll} />
 
         {/* Signals */}
         <div style={{marginBottom:20}}>
@@ -7382,9 +7495,166 @@ function BackfillModal({ story, onClose, onAdd, settings }) {
   );
 }
 
-function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
+// Settings → Basic: pick a theme from three live previews.
+function ThemePicker() {
+  const { theme, setThemeTo } = React.useContext(ThemeContext);
+  return (
+    <div style={{display:'flex',gap:10}}>
+      {THEMES.map(t => {
+        const on = theme === t.id, k = t.colors;
+        return (
+          <button key={t.id} type="button" onClick={() => setThemeTo(t.id)} aria-pressed={on} title={t.sub}
+            style={{flex:1,minWidth:0,padding:8,borderRadius:10,cursor:'pointer',textAlign:'left',background:k.bg,
+              border:`2px solid ${on ? k.accent : k.border}`,boxShadow:on ? `0 0 0 2px ${k.accent}33` : 'none'}}>
+            <div style={{background:k.surface,border:`1px solid ${k.border}`,borderRadius:6,padding:'7px 8px',marginBottom:7}}>
+              <div style={{height:5,width:'70%',borderRadius:3,background:k.text,marginBottom:5}}/>
+              <div style={{height:4,width:'90%',borderRadius:2,background:k.textMute,opacity:0.5,marginBottom:3}}/>
+              <div style={{height:4,width:'55%',borderRadius:2,background:k.textMute,opacity:0.5,marginBottom:6}}/>
+              <div style={{height:8,width:26,borderRadius:4,background:k.accent}}/>
+            </div>
+            <div style={{fontSize:12,fontWeight:800,color:k.text}}>{on ? '✓ ' : ''}{t.label}</div>
+            <div style={{fontSize:10.5,color:k.textMute,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.sub}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+async function fetchHealthRaw() {
+  try {
+    const r = await fetch('/api/lateral/health/check', { cache: 'no-store' });
+    const d = await r.json();
+    if (!r.ok || !d.checks) throw new Error(d?.error || `HTTP ${r.status}`);
+    return d;
+  } catch (e) {
+    return { overall: 'fail', checkedAt: new Date().toISOString(), checks: [{
+      id: 'proxy', label: 'Lateral server', status: 'fail',
+      detail: `Can’t reach the Lateral server (${e.message}).`,
+      fix: 'Check that the lateral-proxy container is running: docker compose ps',
+    }] };
+  }
+}
+
+// Settings → Status: is everything Lateral depends on working, plus backup / restore of your data.
+function SetupStatusPanel({ onShowShortcuts }) {
+  const [health, setHealth] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [plan, setPlan] = useState(null); // a backup file waiting for confirmation
+  const fileRef = useRef(null);
+  const ICON = { ok:'✓', warn:'!', fail:'✗' };
+  const COLOR = { ok:'#059669', warn:'#d97706', fail:'#dc2626' };
+
+  async function runCheck() { setBusy(true); setHealth(await fetchHealthRaw()); setBusy(false); }
+  useEffect(() => { runCheck(); }, []);
+
+  async function downloadBackup() {
+    setMsg('');
+    try {
+      const r = await fetch('/api/lateral/backup', { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `lateral-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      setMsg('Backup downloaded. API keys are not included.');
+    } catch (e) { setMsg('Backup failed: ' + e.message); }
+  }
+
+  async function chooseFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setMsg('');
+    try {
+      const bundle = JSON.parse(await file.text());
+      const r = await fetch('/api/lateral/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bundle, dryRun: true }) });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+      setPlan({ bundle, counts: d.counts, createdAt: d.createdAt, name: file.name });
+    } catch (err) { setMsg('Can’t use that file: ' + err.message); }
+  }
+
+  async function confirmRestore() {
+    setBusy(true); setMsg('');
+    try {
+      const r = await fetch('/api/lateral/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ bundle: plan.bundle }) });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+      // Drop this browser's copy so it can't merge old stories back over the restored ones, then reload.
+      try { localStorage.setItem(SK, JSON.stringify({ stories: [] })); localStorage.removeItem(SSK); } catch {}
+      setMsg('Restored. Reloading…');
+      setTimeout(() => location.reload(), 700);
+    } catch (err) { setMsg('Restore failed: ' + err.message); setBusy(false); }
+  }
+
+  const box = { padding:'10px 12px', borderRadius:8, background:C.surface, border:`1px solid ${C.borderLight}`, marginBottom:14 };
+  const head = { fontSize:10, fontWeight:800, color:C.textMute, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 };
+
+  return (
+    <div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{...head,marginBottom:0}}>Setup check</div>
+        <Btn variant="ghost" onClick={runCheck} disabled={busy} style={{padding:'4px 10px',fontSize:11.5}}>{busy && !plan ? 'Checking…' : 'Re-check'}</Btn>
+      </div>
+      <div style={box}>
+        {!health && <div style={{fontSize:12,color:C.textMute}}>Checking…</div>}
+        {health && health.checks.map(c => (
+          <div key={c.id} style={{display:'flex',gap:10,padding:'6px 0',alignItems:'flex-start'}}>
+            <span style={{width:18,height:18,borderRadius:9,background:COLOR[c.status],color:'#fff',fontSize:11,fontWeight:800,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>{ICON[c.status]}</span>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>{c.label}</div>
+              <div style={{fontSize:11.5,color:C.textMid,lineHeight:1.45}}>{c.detail}</div>
+              {c.fix && c.status !== 'ok' && <div style={{fontSize:11.5,color:COLOR[c.status],lineHeight:1.45,marginTop:2}}>{c.fix}</div>}
+            </div>
+          </div>
+        ))}
+        {health && <div style={{fontSize:10,color:C.textMute,marginTop:6}}>Last checked {new Date(health.checkedAt).toLocaleTimeString()}</div>}
+      </div>
+
+      <div style={head}>Your data</div>
+      <div style={box}>
+        <div style={{fontSize:12,color:C.textMid,lineHeight:1.5,marginBottom:10}}>
+          Back up your stories, predictions, scored articles and settings to one file, or restore from one. API keys are never included.
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <Btn variant="secondary" onClick={downloadBackup} style={{padding:'6px 12px',fontSize:12}}>⬇ Export backup</Btn>
+          <Btn variant="secondary" onClick={() => fileRef.current && fileRef.current.click()} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>⬆ Import backup…</Btn>
+          <input ref={fileRef} type="file" accept="application/json,.json" onChange={chooseFile} style={{display:'none'}}/>
+        </div>
+        {plan && (
+          <div style={{marginTop:12,padding:'10px 12px',borderRadius:8,background:C.bg,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>
+              <strong>{plan.name}</strong>{plan.createdAt ? ` · made ${new Date(plan.createdAt).toLocaleString()}` : ''}<br/>
+              Contains {plan.counts.stories} stor{plan.counts.stories === 1 ? 'y' : 'ies'}, {plan.counts.predictions} prediction{plan.counts.predictions === 1 ? '' : 's'}, {plan.counts.articles} scored article{plan.counts.articles === 1 ? '' : 's'}.
+            </div>
+            <div style={{fontSize:11.5,color:'#b45309',marginTop:6,lineHeight:1.45}}>
+              Importing replaces what Lateral has now. Your current files are kept beside them in the data folder as <code>*.pre-restore-…</code>.
+            </div>
+            <div style={{display:'flex',gap:8,marginTop:10}}>
+              <Btn onClick={confirmRestore} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>{busy ? 'Restoring…' : 'Replace my data'}</Btn>
+              <Btn variant="ghost" onClick={() => setPlan(null)} disabled={busy} style={{padding:'6px 12px',fontSize:12}}>Cancel</Btn>
+            </div>
+          </div>
+        )}
+        {msg && <div style={{marginTop:10,fontSize:11.5,color:C.textMid}}>{msg}</div>}
+      </div>
+
+      <div style={head}>Keyboard</div>
+      <div style={box}>
+        <span style={{fontSize:12,color:C.textMid}}>Press <kbd style={{padding:'1px 6px',borderRadius:4,border:`1px solid ${C.border}`,fontSize:11}}>?</kbd> anywhere for the shortcut list. </span>
+        <button onClick={onShowShortcuts} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:700,padding:0}}>Show shortcuts</button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavilyUsage, setTavilyUsage, initialTab, onShowShortcuts }) {
   const [f,setF]=useState(settings);
-  const [tab,setTab]=useState('basic');
+  const [tab,setTab]=useState(initialTab || 'basic');
   const [status,setStatus]=useState('');
   const [voices,setVoices]=useState([]);
   const [models,setModels]=useState(MODELS);
@@ -7411,6 +7681,7 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
   });
   const [keysLoaded,setKeysLoaded]=useState(false);
   const [pingStatus,setPingStatus]=useState({});
+  const [usageCheckedAt, setUsageCheckedAt] = useState(null);
   const provider = String(f.llmProvider || 'ollama');
   const llmEndpointCandidates = (suffix) => {
     const s = String(suffix || '').startsWith('/') ? String(suffix) : `/${suffix}`;
@@ -7497,6 +7768,17 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
     await pingProvider(provider, { updateGlobalStatus: true });
   }
 
+  async function fetchTavilyUsage() {
+    try {
+      const { d } = await fetchLlmJson('/tavily/usage');
+      setTavilyUsage(d);
+      setUsageCheckedAt(new Date());
+    } catch (e) {
+      setTavilyUsage({ configured: false, error: e.message });
+      setUsageCheckedAt(new Date());
+    }
+  }
+
   async function loadKeyStatus() {
     try {
       setKeysLoaded(false);
@@ -7518,6 +7800,7 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
         setF(prev => ({ ...prev, openaiBaseUrl: d.openaiCompatBaseUrl }));
       }
       setKeysLoaded(true);
+      if (d.tavilyConfigured) fetchTavilyUsage();
     } catch (e) {
       setStatus(`Could not load key status: ${e.message}`);
       setKeysLoaded(true);
@@ -7629,7 +7912,7 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
         tavilyApiKey:''
       });
       setStatus('✓ API keys saved');
-      if (savedTavily) testTavily();
+      if (savedTavily) { testTavily(); fetchTavilyUsage(); }
     } catch (e) {
       setStatus(`Failed: ${e.message}`);
     }
@@ -7685,10 +7968,14 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
         {tabBtn('search', `Web search${keysLoaded && !keyStatus.hasTavily ? ' ⚠' : ''}`)}
         {tabBtn('models', 'Model setup')}
         {tabBtn('podcasts', 'Podcasts')}
+        {tabBtn('status', 'Status')}
       </div>
+
+      {tab === 'status' && <SetupStatusPanel onShowShortcuts={onShowShortcuts}/>}
 
       {tab === 'basic' && (
         <>
+          <Field label="Theme"><ThemePicker/></Field>
           <Field label="Daily refresh time">
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <input type="time" value={f.refreshTime||'08:00'} onChange={e=>setF({...f,refreshTime:e.target.value})} style={{...inputStyle,width:'auto',flex:'none'}}/>
@@ -7784,6 +8071,48 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories }) {
               </span>
             )}
           </div>
+          {/* Tavily usage meter */}
+          {tavilyUsage?.configured && (
+            <div style={{marginTop:12,padding:'10px 12px',borderRadius:6,background:C.bg,border:`1px solid ${C.borderLight}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{fontSize:11,fontWeight:700,color:C.textMute}}>Tavily usage</span>
+                <span style={{fontSize:11,color:C.textMute}}>{tavilyUsage.planName || 'Tavily'}</span>
+              </div>
+              {tavilyUsage.limit !== null ? (
+                <>
+                  <div style={{height:6,background:C.border,borderRadius:3,overflow:'hidden',marginBottom:4}}>
+                    <div style={{height:'100%',width:`${Math.min(100, tavilyUsage.percentage || 0)}%`,background:tavilyUsage.percentage > 90 ? '#dc2626' : tavilyUsage.percentage > 75 ? '#d97706' : '#16a34a',borderRadius:3,transition:'width 0.3s ease'}} />
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:11}}>
+                    <span style={{color:C.textMid}}>{tavilyUsage.usage.toLocaleString()} used</span>
+                    <span style={{color:C.textMid}}>{tavilyUsage.remaining?.toLocaleString()} remaining</span>
+                  </div>
+                  <div style={{fontSize:10,color:C.textMute,marginTop:2}}>
+                    {tavilyUsage.percentage}% of {tavilyUsage.limit.toLocaleString()} monthly credits
+                  </div>
+                </>
+              ) : (
+                <div style={{fontSize:11,color:C.textMid}}>
+                  {tavilyUsage.usage?.toLocaleString ? `${tavilyUsage.usage.toLocaleString()} credits used` : 'Usage data unavailable'}
+                  <span style={{color:C.textMute}}> — no plan limit detected</span>
+                </div>
+              )}
+              {usageCheckedAt && (
+                <div style={{fontSize:10,color:C.textMute,marginTop:4}}>
+                  Last checked {usageCheckedAt.toLocaleTimeString()}
+                  <button onClick={fetchTavilyUsage} style={{marginLeft:8,fontSize:10,color:C.accent,background:'none',border:'none',cursor:'pointer',padding:0,fontWeight:700}}>Refresh</button>
+                </div>
+              )}
+              {tavilyUsage.error && (
+                <div style={{fontSize:11,color:'#dc2626',marginTop:4}}>{tavilyUsage.error}</div>
+              )}
+            </div>
+          )}
+          {tavilyUsage && !tavilyUsage.configured && tavilyUsage.error && (
+            <div style={{marginTop:10,fontSize:11,color:'#b45309',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:6,padding:'7px 10px'}}>
+              {tavilyUsage.error}
+            </div>
+          )}
         </div>
       )}
 
@@ -8067,7 +8396,7 @@ function BriefChip({ label, color, bg }) {
 }
 function BriefContent({ execSummary, storyBriefs, crossBrief, isGlobal = false }) {
   const { theme } = React.useContext(ThemeContext);
-  const C = theme === 'midnight' ? MIDNIGHT : BEIGE;
+  const C = themeById(theme).colors;
 
   // Use local component references to ensure they are available in scope
   const List  = BriefBulletList;
@@ -10107,6 +10436,7 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
         )}
         <div style={{display:'flex', gap:8, maxWidth:680, margin:'0 auto'}}>
           <input
+            id="lateral-home-search"
             value={searchInput}
             onChange={e=>setSearchInput(e.target.value)}
             onKeyDown={handleSearchKey}
@@ -11277,13 +11607,23 @@ function App() {
   const [serverReady,setServerReady]=useState(false);
   const [floatingPlayer, setFloatingPlayer] = useState(null);
   const settingsSyncReadyRef = useRef(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('lateral-theme') || 'beige');
-  
+  const [theme, setTheme] = useState(() => { try { return themeById(localStorage.getItem('lateral-theme')).id; } catch { return 'beige'; } });
+  const [tavilyUsage, setTavilyUsage] = useState(null);
+  // Percentage at which the usage warning was dismissed (0 = not dismissed). It returns if usage climbs 5+ points further.
+  const [tavilyWarningDismissed, setTavilyWarningDismissed] = useState(() => { try { return Number(localStorage.getItem('lateral-tavily-warning-dismissed')) || 0; } catch { return 0; } });
+  const tavilyPollRef = useRef(null);
+  const [settingsTab, setSettingsTab] = useState(null);
+  const [health, setHealth] = useState(null);
+  const [healthDismissed, setHealthDismissed] = useState(false);
+
   const toggleTheme = () => {
-    const newTheme = theme === 'beige' ? 'midnight' : 'beige';
-    setTheme(newTheme);
-    localStorage.setItem('lateral-theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
+    setThemeTo(THEMES[(THEMES.findIndex(t => t.id === theme) + 1) % THEMES.length].id);
+  };
+  const setThemeTo = (id) => {
+    const next = themeById(id).id;
+    setTheme(next);
+    try { localStorage.setItem('lateral-theme', next); } catch {}
+    document.documentElement.setAttribute('data-theme', next);
   };
   
   // Set initial theme attribute on mount
@@ -11366,6 +11706,66 @@ function App() {
     schedule();
     return () => clearTimeout(timer);
   }, [settings?.refreshTime]);
+
+  // Keep the Tavily usage meter and warning banner current: poll every 60s while the tab is visible,
+  // and refresh when the tab regains focus (so credits spent by a brief or search show up promptly).
+  useEffect(() => {
+    async function tick() {
+      if (document.hidden) return;
+      setTavilyUsage(await fetchTavilyUsageRaw());
+    }
+    tick(); // initial
+    tavilyPollRef.current = setInterval(tick, 60000);
+    document.addEventListener('visibilitychange', tick);
+    window.addEventListener('lateral-tavily-spent', tick);
+    return () => {
+      clearInterval(tavilyPollRef.current);
+      document.removeEventListener('visibilitychange', tick);
+      window.removeEventListener('lateral-tavily-spent', tick);
+    };
+  }, []);
+
+  const tavilyPct = tavilyUsage?.configured ? (tavilyUsage.percentage || 0) : 0;
+  const dismissTavilyWarning = () => {
+    setTavilyWarningDismissed(tavilyPct);
+    try { localStorage.setItem('lateral-tavily-warning-dismissed', String(tavilyPct)); } catch {}
+  };
+  const showTavilyWarning = tavilyPct > 85 && tavilyPct >= tavilyWarningDismissed + (tavilyWarningDismissed ? 5 : 0);
+
+  // One setup check shortly after load; a failing dependency (Ollama down, no Tavily key…) raises a banner.
+  useEffect(() => {
+    const t = setTimeout(async () => setHealth(await fetchHealthRaw()), 3500);
+    return () => clearTimeout(t);
+  }, []);
+  const healthProblem = health && health.overall === 'fail' ? health.checks.find(c => c.status === 'fail') : null;
+  const openSettings = (tab) => { setSettingsTab(tab || null); setModal('settings'); };
+
+  // Keyboard shortcuts. Ignored while typing in a field or when a modifier key is held.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target;
+      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+      if (e.key === 'Escape') { if (modal) { e.preventDefault(); setModal(null); } return; }
+      if (modal && e.key !== '?') return;
+      switch (e.key) {
+        case '/':
+          e.preventDefault();
+          setHomeView(true); setSelStory(null); setSelEp(null);
+          setTimeout(() => { const i = document.getElementById('lateral-home-search'); if (i) i.focus(); }, 80);
+          break;
+        case 'h': setHomeView(true); setSelStory(null); setSelEp(null); break;
+        case 'n': e.preventDefault(); setModal('addStory'); break;
+        case 'p': e.preventDefault(); setModal('addPrediction'); break;
+        case ',': e.preventDefault(); openSettings(); break;
+        case 't': toggleTheme(); break;
+        case '?': e.preventDefault(); setModal(modal === 'shortcuts' ? null : 'shortcuts'); break;
+        default: break;
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   // On mount: sync with server.
   // Sets serverSyncReady=true BEFORE calling setData so the triggered save()
@@ -11866,7 +12266,7 @@ function App() {
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setThemeTo }}>
     <div style={{height:'100vh',display:'flex',flexDirection:'column',background:C.bg}}>
       <header style={{position:'relative',flexShrink:0,display:'flex',flexDirection:'column',padding:isMobile?'8px 12px':'0 20px',background:C.surface,borderBottom:`1px solid ${C.borderLight}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',gap:isMobile?8:0}}>
         <div style={{height:isMobile?'auto':52,display:'flex',alignItems:'center',gap:10,minWidth:0}}>
@@ -11888,7 +12288,7 @@ function App() {
             {!isMobile && (
               <>
                 <svg width="60" height="10" viewBox="0 0 60 10" style={{flexShrink:0}}>
-                  <line x1="0" y1="5" x2="60" y2="5" stroke={theme === 'midnight' ? '#3d3058' : '#e2e8f0'} strokeWidth="2"/>
+                  <line x1="0" y1="5" x2="60" y2="5" stroke={theme === 'midnight' ? '#3d3058' : theme === 'ledger' ? '#a9bfac' : '#e2e8f0'} strokeWidth="2"/>
                   <circle cx="10" cy="5" r="3" fill="#2563eb"/>
                   <circle cx="28" cy="5" r="3" fill="#059669"/>
                   <circle cx="44" cy="5" r="3" fill="#dc2626"/>
@@ -11943,7 +12343,7 @@ function App() {
               </svg>
             </button>
           )}
-          <button onClick={toggleTheme} title={`Switch to ${theme === 'beige' ? 'Midnight' : 'Beige'} theme`} style={{border:'none',background:'none',fontSize:16,cursor:'pointer',color:C.textMute,padding:'4px 8px',borderRadius:6,flexShrink:0}}>{theme === 'beige' ? '🌙' : '☀️'}</button>
+          <button onClick={toggleTheme} title={`Theme: ${themeById(theme).label} — click for ${THEMES[(THEMES.findIndex(t => t.id === theme) + 1) % THEMES.length].label} (or press t)`} style={{border:'none',background:'none',fontSize:16,cursor:'pointer',color:C.textMute,padding:'4px 8px',borderRadius:6,flexShrink:0}}>{themeById(theme).icon}</button>
         </div>
         {isMobile && (
           <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:4}}>
@@ -11978,6 +12378,29 @@ function App() {
           </div>
         )}
       </header>
+      {showTavilyWarning && (
+        <div style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 14px',background:'#fef3c7',borderBottom:'1px solid #fcd34d',color:'#92400e',fontSize:13}}>
+          <span>
+            <strong>⚠ Tavily usage at {tavilyUsage.percentage}%</strong>
+            {' — intelligence features may stop working when credits run out.'}
+          </span>
+          <button
+            onClick={dismissTavilyWarning}
+            style={{flexShrink:0,background:'transparent',border:'1px solid #d97706',borderRadius:6,color:'#92400e',fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer'}}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {healthProblem && !healthDismissed && (
+        <div style={{flexShrink:0,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'8px 14px',background:'#fee2e2',borderBottom:'1px solid #fca5a5',color:'#991b1b',fontSize:13}}>
+          <span><strong>Setup needs attention:</strong> {healthProblem.label} — {healthProblem.detail}</span>
+          <span style={{display:'flex',gap:8,flexShrink:0}}>
+            <button onClick={()=>openSettings('status')} style={{background:'#991b1b',border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:700,padding:'3px 10px',cursor:'pointer'}}>See what to do</button>
+            <button onClick={()=>setHealthDismissed(true)} style={{background:'transparent',border:'1px solid #dc2626',borderRadius:6,color:'#991b1b',fontSize:11,fontWeight:600,padding:'3px 10px',cursor:'pointer'}}>Dismiss</button>
+          </span>
+        </div>
+      )}
       <div style={{flex:1,display:'flex',overflow:'hidden',position:'relative'}}>
         {!isMobile && (
           <LeftPanel
@@ -12034,7 +12457,18 @@ function App() {
       {modal==='addEpisode' && story && <AddEpisodeModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='backfill'   && story && <BackfillModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='discover'   && story && <DiscoverModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
-      {modal==='settings'   && <SettingsModal settings={settings} onSave={setSettings} onClose={()=>setModal(null)} onPurgeDeletedStories={purgeDeletedStories}/>}
+      {modal==='settings'   && <SettingsModal settings={settings} onSave={setSettings} onClose={()=>{setModal(null);setSettingsTab(null);}}onPurgeDeletedStories={purgeDeletedStories} tavilyUsage={tavilyUsage} setTavilyUsage={setTavilyUsage} initialTab={settingsTab} onShowShortcuts={()=>setModal('shortcuts')}/>}
+      {modal==='shortcuts'  && (
+        <Modal title="Keyboard shortcuts" onClose={()=>setModal(null)} maxWidth={420}>
+          {[['/','Search the news'],['h','Home'],['n','New story'],['p','New prediction'],[',','Settings'],['t','Switch theme'],['?','This list'],['Esc','Close a window']].map(([k,d]) => (
+            <div key={k} style={{display:'flex',alignItems:'center',gap:14,padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+              <kbd style={{minWidth:34,textAlign:'center',padding:'2px 8px',borderRadius:5,border:`1px solid ${C.border}`,background:C.surface,color:C.text,fontSize:12,fontWeight:700,fontFamily:'inherit'}}>{k}</kbd>
+              <span style={{fontSize:13,color:C.text}}>{d}</span>
+            </div>
+          ))}
+          <div style={{fontSize:11,color:C.textMute,marginTop:10}}>Shortcuts are off while you’re typing in a box.</div>
+        </Modal>
+      )}
       {modal==='brief'      && <BriefModal stories={storiesView} settings={settings} onClose={()=>setModal(null)}/>}
       {NOTEBOOKLM_EXPORT_ENABLED && modal==='notebooklm' && <NotebookLMExportModal stories={storiesView} onClose={()=>setModal(null)}/>}
       {modal==='map'        && <SpiderMapModal stories={storiesView} onClose={()=>setModal(null)} onSelectStory={id=>{setSelStory(id);setSelEp(null);setHomeView(false);setModal(null);}}/>}

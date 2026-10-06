@@ -354,6 +354,7 @@ async function handleCachePost(req, res) {
 const v2 = require('./v2');
 const relevance = require('./relevance');
 const images = require('./images');
+const ops = require('./ops');
 
 // ─── HTTP request helper ─────────────────────────────────────────────────────────────────
 
@@ -2343,6 +2344,40 @@ async function tavilySearch({ query, domains, maxResults = 8, timeout = 12000 } 
   })).filter(x => x.url);
 }
 
+async function handleTavilyUsage(res) {
+  const tavilyKey = resolveLlmSecrets().tavilyApiKey;
+  if (!tavilyKey) return send(res, 200, { configured: false, error: 'No Tavily key saved' });
+  try {
+    const { status, body } = await request('https://api.tavily.com/usage', {
+      headers: { 'Authorization': `Bearer ${tavilyKey}` },
+      timeout: 10000,
+    });
+    if (status < 200 || status >= 300) throw new Error(`Tavily ${status}: ${String(body || '').slice(0, 200)}`);
+    const parsed = JSON.parse(body || '{}');
+    const account = parsed?.account || {};
+    const key = parsed?.key || {};
+    const limit = account.plan_limit ?? key.limit ?? null;
+    const usage = account.plan_usage ?? key.usage ?? 0;
+    return send(res, 200, {
+      configured: true,
+      planName: account.current_plan || 'Unknown',
+      limit,
+      usage,
+      remaining: limit !== null ? Math.max(0, limit - usage) : null,
+      percentage: limit ? Math.round((usage / limit) * 100) : null,
+      breakdown: {
+        search: account.search_usage ?? key.search_usage ?? 0,
+        extract: account.extract_usage ?? key.extract_usage ?? 0,
+        crawl: account.crawl_usage ?? key.crawl_usage ?? 0,
+        map: account.map_usage ?? key.map_usage ?? 0,
+        research: account.research_usage ?? key.research_usage ?? 0,
+      },
+    });
+  } catch (e) {
+    return send(res, 502, { configured: true, error: e.message || 'Usage fetch failed' });
+  }
+}
+
 async function fetchBraveNewsFallback(query, { timeout = 12000, limit = 12 } = {}) {
   const q = encodeURIComponent(String(query || '').trim());
   const url = `https://search.brave.com/news?q=${q}`;
@@ -4266,11 +4301,19 @@ const server = http.createServer(async (req, res) => {
   const isIntelCancel = pathname === '/intelligence/cancel' || pathname === '/api/lateral/intelligence/cancel';
   const isRefreshLog  = pathname === '/refresh-log'         || pathname === '/api/lateral/refresh-log';
   const isTavilySocial = pathname === '/tavily-social' || pathname === '/api/lateral/tavily-social';
+  const isTavilyUsage  = pathname === '/tavily/usage'  || pathname === '/api/lateral/tavily/usage';
   const isRelCheck    = pathname === '/relevance/check'    || pathname === '/api/lateral/relevance/check';
   const isRelOverride = pathname === '/relevance/override' || pathname === '/api/lateral/relevance/override';
   const isImgResolve  = pathname === '/images/resolve' || pathname === '/api/lateral/images/resolve';
   const isImgStats    = pathname === '/images/stats'   || pathname === '/api/lateral/images/stats';
 
+  const isBackup  = pathname === '/backup'       || pathname === '/api/lateral/backup';
+  const isRestore = pathname === '/restore'      || pathname === '/api/lateral/restore';
+  const isHealth  = pathname === '/health/check' || pathname === '/api/lateral/health/check';
+  const opsCtx = { dataDir: DATA_DIR, send, getTavilyKey: () => resolveLlmSecrets().tavilyApiKey };
+  if (isBackup  && req.method === 'GET')  return ops.handleBackup(res, opsCtx);
+  if (isRestore && req.method === 'POST') return ops.handleRestore(req, res, opsCtx);
+  if (isHealth  && req.method === 'GET')  return await ops.handleHealth(res, opsCtx);
   if (isImgResolve && req.method === 'POST') return await handleImagesResolve(req, res);
   if (isImgStats && req.method === 'GET') return send(res, 200, images.getStats());
   if (isRelCheck && req.method === 'POST') return await handleRelevanceCheck(req, res);
@@ -4311,6 +4354,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 502, { error: e.message || 'Tavily search failed' });
     }
   }
+  if (isTavilyUsage && req.method === 'GET') return await handleTavilyUsage(res);
   if (isSearch) return await handleVaneSearch(reqUrl, res);
   if (isVideos) return await handleVideos(reqUrl, res);
   if (isPodcasts) return await handlePodcasts(reqUrl, res);
