@@ -1,5 +1,15 @@
 # Lateral — narrative memory
 
+## Why
+
+News is built to be forgotten. Each story arrives as if it had no past: a headline, a burst of coverage, then the next thing. Months later you remember that something happened (a lawsuit, a recall, a promise from someone in power) but not how it ended, or whether it ended at all.
+
+Feeds don't help. They rank what's new, not what's unfinished. Search finds articles, not arcs.
+
+Lateral is for the stories you don't want to lose track of. You tell it what you're following, and it keeps the timeline, gathers new coverage, tells you when something moves, and saves readable copies so the record survives dead links. When you think you know where a story is heading, you can write that down as a prediction and watch the evidence build for or against it, then keep score of how often you were right.
+
+It runs on your own machine. Your stories, notes and predictions stay there.
+
 Lateral is a local-first tool for following stories that unfold over months. You track a story, and Lateral keeps its timeline,
 gathers fresh coverage, shows you what changed, and lets you test predictions against the evidence as it arrives.
 
