@@ -6919,6 +6919,10 @@ function AddPanel({ stories, selStory, settings, onAddStory, onAddEpisode }) {
 function PredictionDetail({ predictionId, compact }) {
   const [prediction, setPrediction] = useState(null);
   const [links, setLinks] = useState([]);
+  const [marketLinks, setMarketLinks] = useState([]);
+  const [marketSearchOpen, setMarketSearchOpen] = useState(false);
+  const [marketSearchResults, setMarketSearchResults] = useState([]);
+  const [marketSearchLoading, setMarketSearchLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -6928,22 +6932,60 @@ function PredictionDetail({ predictionId, compact }) {
       if (first) setLoading(true);
       return Promise.all([
         fetch(`/v2/predictions/${predictionId}`).then(r => r.ok ? r.json() : null),
-        fetch(`/v2/links?predictionId=${predictionId}`).then(r => r.ok ? r.json() : null)
+        fetch(`/v2/links?predictionId=${predictionId}`).then(r => r.ok ? r.json() : null),
+        fetch(`/v2/predictions/${predictionId}/markets`).then(r => r.ok ? r.json() : null)
       ])
-      .then(([pData, lData]) => {
+      .then(([pData, lData, mData]) => {
         if (!alive) return;
         if (pData?.prediction) setPrediction(pData.prediction);
         if (lData?.links) setLinks(lData.links);
+        if (mData?.marketLinks) setMarketLinks(mData.marketLinks);
         setLoading(false);
       })
       .catch(() => { if (alive) setLoading(false); });
     };
     load(true);
-    // The center view announces edits (signals, overrides, finished searches) so this panel stays current.
     const onUpdated = (e) => { if (!e.detail || e.detail === predictionId) load(false); };
     window.addEventListener('lateral-prediction-updated', onUpdated);
     return () => { alive = false; window.removeEventListener('lateral-prediction-updated', onUpdated); };
   }, [predictionId]);
+
+  async function searchMarkets() {
+    if (!prediction) return;
+    setMarketSearchLoading(true);
+    try {
+      const r = await fetch(`/v2/predictions/${predictionId}/markets/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: prediction.statement })
+      });
+      const data = await r.json();
+      setMarketSearchResults(data.markets || []);
+    } catch (e) { console.error('Market search failed', e); }
+    setMarketSearchLoading(false);
+  }
+
+  async function linkMarket(m) {
+    try {
+      const r = await fetch(`/v2/predictions/${predictionId}/markets/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: m.source, marketId: m.marketId, question: m.question, slug: m.slug, currentPrice: m.currentPrice, volume: m.volume })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setMarketLinks(prev => [...prev, data.marketLink]);
+        setMarketSearchResults(prev => prev.filter(x => !(x.source === m.source && x.marketId === m.marketId)));
+      }
+    } catch (e) { console.error('Link market failed', e); }
+  }
+
+  async function unlinkMarket(linkId) {
+    try {
+      const r = await fetch(`/v2/predictions/${predictionId}/markets/${linkId}`, { method: 'DELETE' });
+      if (r.ok) setMarketLinks(prev => prev.filter(m => m.id !== linkId));
+    } catch (e) { console.error('Unlink market failed', e); }
+  }
 
   if (loading) return <div style={{color:C.textMute,fontSize:13}}>Loading prediction…</div>;
   if (!prediction) return <div style={{color:C.textMute,fontSize:13}}>Prediction not found.</div>;
@@ -7037,6 +7079,68 @@ function PredictionDetail({ predictionId, compact }) {
           <div style={{fontSize:11,color:C.textMute}}>{complicates.length} items</div>
         </div>
       )}
+
+      {/* ─── Market Witness ───────────────────────────────────────────────────────── */}
+      <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em'}}>📈 Market implied</div>
+          <button onClick={() => { setMarketSearchOpen(!marketSearchOpen); if (!marketSearchOpen) searchMarkets(); }}
+            style={{fontSize:11,color:C.accent,background:'transparent',border:'none',cursor:'pointer',padding:0}}>
+            {marketSearchOpen ? 'Close' : 'Find markets'}
+          </button>
+        </div>
+
+        {marketLinks.length > 0 && (
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:10}}>
+            {marketLinks.map(m => {
+              const change = m.currentPrice - m.previousPrice;
+              const changePct = m.previousPrice > 0 ? ((change / m.previousPrice) * 100).toFixed(1) : '0.0';
+              const color = change > 0 ? '#059669' : change < 0 ? '#dc2626' : C.textMute;
+              const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '—';
+              const fmtPrice = m.source === 'kalshi' ? `${m.currentPrice.toFixed(1)}¢` : `${(m.currentPrice * 100).toFixed(1)}%`;
+              return (
+                <div key={m.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 8px',borderRadius:6,background:C.bg,border:`1px solid ${C.border}`}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:11,fontWeight:700,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.question}</div>
+                    <div style={{fontSize:10,color:C.textMute,marginTop:2}}>{m.source} · Vol {Number(m.volume).toLocaleString()}</div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginLeft:8}}>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontSize:14,fontWeight:900,color:C.text}}>{fmtPrice}</div>
+                      <div style={{fontSize:10,color}}>{arrow} {Math.abs(changePct)}%</div>
+                    </div>
+                    <button onClick={() => unlinkMarket(m.id)}
+                      style={{fontSize:10,color:C.textMute,background:'transparent',border:'none',cursor:'pointer',padding:'2px 4px'}}>✕</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {marketSearchOpen && (
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {marketSearchLoading && <div style={{fontSize:11,color:C.textMute}}>Searching markets…</div>}
+            {marketSearchResults.length === 0 && !marketSearchLoading && <div style={{fontSize:11,color:C.textMute}}>No markets found.</div>}
+            {marketSearchResults.map(m => {
+              const already = marketLinks.find(l => l.marketId === m.marketId && l.source === m.source);
+              const fmtPrice = m.source === 'kalshi' ? `${m.currentPrice.toFixed(1)}¢` : `${(m.currentPrice * 100).toFixed(1)}%`;
+              return (
+                <div key={`${m.source}-${m.marketId}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 8px',borderRadius:6,background:C.bg,border:`1px solid ${C.border}`}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:11,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.question}</div>
+                    <div style={{fontSize:10,color:C.textMute}}>{m.source} · Vol {Number(m.volume).toLocaleString()} · {fmtPrice}</div>
+                  </div>
+                  <button onClick={() => linkMarket(m)} disabled={already}
+                    style={{fontSize:11,fontWeight:700,color:already ? C.textMute : C.accent,background:'transparent',border:`1px solid ${already ? C.border : C.accent}`,borderRadius:4,cursor:already ? 'default' : 'pointer',padding:'3px 8px',flexShrink:0,marginLeft:8}}>
+                    {already ? 'Linked' : 'Link'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -350,6 +350,7 @@ async function runSearchJob(job) {
 
 // ─── Same-story grouping ──────────────────────────────────────────────────────────
 const dedupe = require('./dedupe');
+const markets = require('./markets');
 const _grouping = new Map(); // predictionId -> { state, startedAt, finishedAt, stats }
 
 function entriesFor(v, predId) {
@@ -430,7 +431,7 @@ function handlePredictionGet(reqUrl, res) {
     const item = v2.items.find(i => i.id === l.itemId);
     return { ...item, link: l };
   });
-  send(res, 200, { prediction: p, items, evidence: computeEvidence(links, groupsFor(v2, id)), grouping: groupingState(id) });
+  send(res, 200, { prediction: p, items, evidence: computeEvidence(links, groupsFor(v2, id)), grouping: groupingState(id), marketLinks: p.marketLinks || [] });
 }
 
 // GET /v2/calibration — track record across resolved predictions.
@@ -717,6 +718,128 @@ function localExtension() {
   return _localExt;
 }
 
+// ─── Market Witness Routes ─────────────────────────────────────────────────────────
+
+// POST /v2/predictions/:id/markets/search { query }
+function handleMarketsSearch(req, reqUrl, res) {
+  const parts = reqUrl.pathname.split('/').filter(Boolean);
+  const predId = parts[2];
+  const v2 = readV2();
+  const p = v2.predictions.find(x => x.id === predId);
+  if (!p) return send(res, 404, { error: 'Prediction not found' });
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', async () => {
+    try {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const query = String(body.query || p.statement).trim();
+      const result = await markets.searchMarkets(query, body.sources, body.limit || 8);
+      send(res, 200, result);
+    } catch (e) { send(res, 502, { error: e.message }); }
+  });
+}
+
+// POST /v2/predictions/:id/markets/link { source, marketId, question, slug, currentPrice }
+function handleMarketsLink(req, reqUrl, res) {
+  const parts = reqUrl.pathname.split('/').filter(Boolean);
+  const predId = parts[2];
+  const v2 = readV2();
+  const idx = v2.predictions.findIndex(x => x.id === predId);
+  if (idx === -1) return send(res, 404, { error: 'Prediction not found' });
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const p = v2.predictions[idx];
+      p.marketLinks = p.marketLinks || [];
+      if (p.marketLinks.find(m => m.marketId === body.marketId && m.source === body.source)) {
+        return send(res, 409, { error: 'Market already linked' });
+      }
+      const link = {
+        id: uuid(),
+        source: body.source,
+        marketId: body.marketId,
+        question: body.question || '',
+        slug: body.slug || '',
+        currentPrice: Number(body.currentPrice) || 0,
+        previousPrice: Number(body.currentPrice) || 0,
+        volume: Number(body.volume) || 0,
+        linkedAt: nowIso(),
+        linkedBy: 'user',
+        status: 'active',
+      };
+      p.marketLinks.push(link);
+      p.updatedAt = nowIso();
+      writeV2(v2);
+      send(res, 201, { marketLink: link });
+    } catch (e) { send(res, 400, { error: e.message }); }
+  });
+}
+
+// DELETE /v2/predictions/:id/markets/:marketLinkId
+function handleMarketsUnlink(req, reqUrl, res) {
+  const parts = reqUrl.pathname.split('/').filter(Boolean);
+  const predId = parts[2];
+  const linkId = parts[4];
+  const v2 = readV2();
+  const p = v2.predictions.find(x => x.id === predId);
+  if (!p) return send(res, 404, { error: 'Prediction not found' });
+  if (!p.marketLinks) return send(res, 404, { error: 'No market links' });
+  const before = p.marketLinks.length;
+  p.marketLinks = p.marketLinks.filter(m => m.id !== linkId);
+  if (p.marketLinks.length === before) return send(res, 404, { error: 'Market link not found' });
+  p.updatedAt = nowIso();
+  writeV2(v2);
+  send(res, 200, { ok: true });
+}
+
+// GET /v2/predictions/:id/markets
+async function handleMarketsGet(reqUrl, res) {
+  const parts = reqUrl.pathname.split('/').filter(Boolean);
+  const predId = parts[2];
+  const v2 = readV2();
+  const p = v2.predictions.find(x => x.id === predId);
+  if (!p) return send(res, 404, { error: 'Prediction not found' });
+  const links = p.marketLinks || [];
+  // Refresh prices in background (best effort)
+  const refreshed = await Promise.all(links.map(async m => {
+    const price = await markets.refreshMarketPrice(m);
+    if (!price.error) {
+      m.previousPrice = m.currentPrice;
+      m.currentPrice = price.currentPrice;
+      m.volume = price.volume || m.volume;
+      m.lastUpdated = price.updatedAt;
+    }
+    return m;
+  }));
+  p.marketLinks = refreshed;
+  writeV2(v2);
+  send(res, 200, { marketLinks: refreshed });
+}
+
+// POST /v2/markets/refresh — refresh all linked market prices across all predictions
+async function handleMarketsRefresh(req, res) {
+  const v2 = readV2();
+  let refreshed = 0, errors = 0;
+  for (const p of v2.predictions) {
+    if (!p.marketLinks) continue;
+    for (const m of p.marketLinks) {
+      const price = await markets.refreshMarketPrice(m);
+      if (price.error) { errors++; }
+      else {
+        m.previousPrice = m.currentPrice;
+        m.currentPrice = price.currentPrice;
+        m.volume = price.volume || m.volume;
+        m.lastUpdated = price.updatedAt;
+        refreshed++;
+      }
+    }
+  }
+  writeV2(v2);
+  send(res, 200, { refreshed, errors });
+}
+
 // ─── Main Router ──────────────────────────────────────────────────────────────
 
 function route(req, reqUrl, res, llmConfig) {
@@ -729,7 +852,7 @@ function route(req, reqUrl, res, llmConfig) {
   if (pathname.startsWith('/v2/predictions/') && pathname.endsWith('/search/status') && req.method === 'GET') {
     return handleSearchStatus(reqUrl, res);
   }
-  if (pathname.startsWith('/v2/predictions/') && req.method === 'GET' && !pathname.endsWith('/search')) {
+  if (pathname.startsWith('/v2/predictions/') && req.method === 'GET' && !pathname.endsWith('/search') && !pathname.endsWith('/markets')) {
     return handlePredictionGet(reqUrl, res);
   }
   if (pathname.startsWith('/v2/predictions/') && req.method === 'PATCH') {
@@ -738,6 +861,21 @@ function route(req, reqUrl, res, llmConfig) {
   if (pathname.startsWith('/v2/predictions/') && req.method === 'DELETE') {
     return handlePredictionDelete(reqUrl, res);
   }
+  // Market Witness routes (must precede generic /search catch)
+  if (pathname.endsWith('/markets/search') && pathname.startsWith('/v2/predictions/') && req.method === 'POST') {
+    return handleMarketsSearch(req, reqUrl, res);
+  }
+  if (pathname.endsWith('/markets/link') && pathname.startsWith('/v2/predictions/') && req.method === 'POST') {
+    return handleMarketsLink(req, reqUrl, res);
+  }
+  if (pathname.endsWith('/markets') && pathname.startsWith('/v2/predictions/') && req.method === 'GET') {
+    return handleMarketsGet(reqUrl, res);
+  }
+  if (pathname.match(/^\/v2\/predictions\/[^/]+\/markets\/[^/]+$/) && req.method === 'DELETE') {
+    return handleMarketsUnlink(req, reqUrl, res);
+  }
+  if (pathname === '/v2/markets/refresh' && req.method === 'POST') return handleMarketsRefresh(req, res);
+
   if (pathname.endsWith('/search') && pathname.startsWith('/v2/predictions/') && req.method === 'POST') {
     return handlePredictionSearch(req, reqUrl, res);
   }
