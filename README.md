@@ -6,6 +6,16 @@ gathers fresh coverage, shows you what changed, and lets you test predictions ag
 It is a single-page app (`index.html`) plus a small Node server. It runs on your own machine and uses [Ollama](https://ollama.com)
 for the AI parts; cloud LLM providers are optional.
 
+## Screenshots
+
+![The home overview in the Midnight theme: status cards, a breakdown of every tracked story, and a feed of the latest coverage](screenshots/overview-midnight.webp)
+
+*The home overview (Midnight theme): every tracked story at a glance, with the latest coverage for each below. Lateral also has a light theme; switch with the sun/moon icon.*
+
+![A story page: an episode timeline, the latest headlines, and video, podcast and social context](screenshots/story-view.webp)
+
+*A story page: the episode timeline, the latest headlines (with the relevance filter's **Check relevance** button), and video, podcast and social context.*
+
 ## Features
 
 - **Story timelines** — episodes, headlines, video and podcast context, intelligence briefs, a connection map, and shareable pages.
