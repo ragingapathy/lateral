@@ -134,6 +134,63 @@
     }
     .hd-primary:hover { transform: translateY(-1px); filter: brightness(1.07); }
 
+    /* Civic profile (right column): one look for the portrait, quick actions, social tiles and chips */
+    .cv-hero { position: relative; text-align: center; padding: 26px 18px 18px; border-bottom: 1px solid var(--border-light);
+      background: linear-gradient(180deg, var(--accent-light) 0%, transparent 100%); }
+    .cv-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 8px; background: none; color: var(--text-mute); cursor: pointer; transition: background 0.12s ease, color 0.12s ease; }
+    .cv-close:hover { background: var(--border-light); color: var(--text); }
+    .cv-photo { display: block; margin: 0 auto 14px; border-radius: 20px; object-fit: cover; object-position: 50% 18%; background: var(--border-light);
+      border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--border), 0 14px 26px -14px rgba(0,0,0,0.5); }
+    .cv-initials { display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', Georgia, serif; font-weight: 900;
+      color: var(--accent); background: var(--accent-light); letter-spacing: 0.02em; }
+    .cv-name { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-weight: 900; line-height: 1.2; color: var(--text); }
+    .cv-office { margin-top: 5px; font-size: 12.5px; color: var(--text-mid); line-height: 1.45; }
+    .cv-chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 11px; }
+    .cv-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text-mid); font-size: 11px; font-weight: 800; letter-spacing: 0.02em; }
+    .cv-chip.warn { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .cv-body { padding: 16px 18px 28px; }
+    .cv-sec { margin-top: 20px; }
+    .cv-sec:first-child { margin-top: 0; }
+    .cv-h { margin-bottom: 9px; font-size: 10px; font-weight: 800; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.07em; }
+    .cv-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .cv-act { flex: 1 1 62px; min-width: 62px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      padding: 11px 6px 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-mid);
+      font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-decoration: none; cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease; }
+    .cv-act svg { color: var(--accent); }
+    .cv-act:hover { transform: translateY(-1px); border-color: var(--accent); background: var(--accent-light); color: var(--accent); box-shadow: 0 8px 16px -10px var(--accent); }
+    .cv-facts { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; font-size: 12.5px; }
+    .cv-facts dt { color: var(--text-mute); }
+    .cv-facts dd { margin: 0; color: var(--text); min-width: 0; word-break: break-word; }
+    .cv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .cv-tile { position: relative; display: flex; align-items: center; min-width: 0; border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease; }
+    .cv-tile:hover { transform: translateY(-1px); border-color: var(--accent); box-shadow: 0 8px 16px -10px var(--accent); }
+    .cv-tile-a { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 8px 10px; color: var(--text); text-decoration: none; font: inherit; background: none; border: none; cursor: pointer; text-align: left; }
+    .cv-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+    .cv-tx { min-width: 0; line-height: 1.25; }
+    .cv-tx b { display: block; font-size: 12px; font-weight: 800; }
+    .cv-tx span { display: block; font-size: 11px; color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cv-x { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; display: none; align-items: center; justify-content: center; border: none; border-radius: 6px;
+      background: var(--border-light); color: var(--text-mute); cursor: pointer; }
+    .cv-tile:hover .cv-x { display: inline-flex; }
+    .cv-x:hover { color: #991b1b; }
+    .cv-ghost { border-style: dashed; background: transparent; box-shadow: none; color: var(--text-mute); }
+    .cv-ghost .cv-ico { background: var(--border-light); color: var(--text-mute); }
+    .cv-ghost .cv-tile-a { color: var(--text-mute); }
+    .cv-ghost:hover { background: var(--accent-light); box-shadow: none; }
+    .cv-ghost:hover .cv-ico { background: var(--surface); color: var(--accent); }
+    .cv-ghost:hover .cv-tile-a { color: var(--accent); }
+    .cv-tag { font-size: 9.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-mute); }
+    .cv-cand { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-light); }
+    .cv-vid { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--border-light); text-decoration: none; }
+    .cv-vid img, .cv-vid i { width: 76px; height: 43px; border-radius: 7px; object-fit: cover; flex-shrink: 0; background: var(--border-light); display: block; }
+    .cv-vid b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.4; color: var(--text); }
+    .cv-vid span { display: block; margin-top: 3px; font-size: 10.5px; color: var(--text-mute); }
+    .cv-vid:hover b { color: var(--accent); }
+
     [data-theme="ledger"] body { font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
     /* Headings that use the serif display face pick up Libre Caslon in this theme. */
     [data-theme="ledger"] [style*="Playfair Display"] { font-family: 'Libre Caslon Text', Georgia, serif !important; }
@@ -1673,7 +1730,8 @@ function storyRelevanceCtx(story) {
 }
 async function checkRelevance(rctx, articles) {
   const list = Array.isArray(articles) ? articles : [];
-  const checkable = list.filter(a => a && a.url && a.title);
+  // Items from official sources (Civic watches: legislation, bills, rules) are never second-guessed by the AI relevance filter.
+  const checkable = list.filter(a => a && a.url && a.title && !(a.source && a.source.engine === 'civic'));
   if (!rctx?.topic || !checkable.length) return { kept: list, filtered: [], stats: null };
   try {
     const r = await fetch('/api/lateral/relevance/check', {
@@ -3379,7 +3437,8 @@ function StoryCard({
   );
 }
 
-function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDeleteStory, onReorderStories, isOpen, onOpen, onClose, activeView, onViewChange, libraryNode }) {
+function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDeleteStory, onReorderStories, isOpen, onOpen, onClose, activeView, onViewChange, libraryNode, civicNode, fluid = false }) {
+  const panelW = fluid ? '100%' : 304, panelMin = fluid ? 0 : 304;   // inside a phone drawer the panel fills it
   const [q,setQ]=useState('');
   const [sf,setSf]=useState('all');
   const [draggingStoryId, setDraggingStoryId] = useState(null);
@@ -3446,6 +3505,10 @@ function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDe
             <path d="M5 17a3 3 0 013-3h9.5" stroke="currentColor" strokeWidth="1.6"/>
           </svg>
         </button>
+        <button onClick={()=>{onViewChange('civic'); onOpen();}} title="Civic: who represents you"
+          style={{width:36,height:36,borderRadius:9,border:`1px solid ${activeView==='civic'?C.accent:C.border}`,background:activeView==='civic'?C.accent+'22':C.surface,color:activeView==='civic'?C.accent:C.text,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}>
+          <LIcon size={16}>{ICONS.civic}</LIcon>
+        </button>
         <button onClick={onOpen} title="Open search"
           style={{width:36,height:36,borderRadius:9,border:`1px solid ${C.border}`,background:C.surface,color:C.text,cursor:'pointer',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3456,34 +3519,54 @@ function LeftPanel({ stories, selectedId, onSelect, onNew, onNewPrediction, onDe
       </div>
     );
   }
-  const tabStyle = on => ({padding:'4px 10px',borderRadius:6,border:'none',background:on?C.accent:C.border,color:on?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'});
+  const tabStyle = on => ({padding:'4px 7px',borderRadius:6,border:'none',background:on?C.accent:C.border,color:on?'#fff':C.textMute,fontSize:10.5,fontWeight:700,cursor:'pointer'});
   if (activeView==='library') {
     return (
-      <div style={{width:272,minWidth:272,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
+      <div style={{width:panelW,minWidth:panelMin,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
         <div style={{padding:'14px 14px 10px'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div style={{display:'flex',gap:4}}>
               <button onClick={()=>onViewChange('stories')} style={tabStyle(false)}>Stories</button>
               <button onClick={()=>onViewChange('predictions')} style={tabStyle(false)}>Predictions</button>
               <button onClick={()=>onViewChange('library')} style={tabStyle(true)}>Library</button>
+              <button onClick={()=>onViewChange('civic')} style={tabStyle(false)}>Civic</button>
             </div>
-            <button onClick={onClose} title="Collapse panel" style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>×</button>
+            <button hidden={fluid} onClick={onClose} title="Collapse panel" style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>×</button>
           </div>
         </div>
         {libraryNode}
       </div>
     );
   }
+  if (activeView==='civic') {
+    return (
+      <div style={{width:panelW,minWidth:panelMin,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
+        <div style={{padding:'14px 14px 10px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div style={{display:'flex',gap:4}}>
+              <button onClick={()=>onViewChange('stories')} style={tabStyle(false)}>Stories</button>
+              <button onClick={()=>onViewChange('predictions')} style={tabStyle(false)}>Predictions</button>
+              <button onClick={()=>onViewChange('library')} style={tabStyle(false)}>Library</button>
+              <button onClick={()=>onViewChange('civic')} style={tabStyle(true)}>Civic</button>
+            </div>
+            <button hidden={fluid} onClick={onClose} title="Collapse panel" style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>×</button>
+          </div>
+        </div>
+        {civicNode}
+      </div>
+    );
+  }
   return (
-    <div style={{width:272,minWidth:272,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
+    <div style={{width:panelW,minWidth:panelMin,height:'100%',display:'flex',flexDirection:'column',background:C.bg,borderRight:`1px solid ${C.border}`}}>
       <div style={{padding:'14px 14px 10px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
           <div style={{display:'flex',gap:4}}>
-            <button onClick={()=>onViewChange('stories')} style={{padding:'4px 10px',borderRadius:6,border:'none',background:activeView==='stories'?C.accent:C.border,color:activeView==='stories'?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'}}>Stories</button>
-            <button onClick={()=>onViewChange('predictions')} style={{padding:'4px 10px',borderRadius:6,border:'none',background:activeView==='predictions'?C.accent:C.border,color:activeView==='predictions'?'#fff':C.textMute,fontSize:11,fontWeight:700,cursor:'pointer'}}>Predictions</button>
+            <button onClick={()=>onViewChange('stories')} style={{padding:'4px 7px',borderRadius:6,border:'none',background:activeView==='stories'?C.accent:C.border,color:activeView==='stories'?'#fff':C.textMute,fontSize:10.5,fontWeight:700,cursor:'pointer'}}>Stories</button>
+            <button onClick={()=>onViewChange('predictions')} style={{padding:'4px 7px',borderRadius:6,border:'none',background:activeView==='predictions'?C.accent:C.border,color:activeView==='predictions'?'#fff':C.textMute,fontSize:10.5,fontWeight:700,cursor:'pointer'}}>Predictions</button>
             <button onClick={()=>onViewChange('library')} style={tabStyle(false)}>Library</button>
+            <button onClick={()=>onViewChange('civic')} style={tabStyle(false)}>Civic</button>
           </div>
-          <button onClick={onClose} title="Collapse panel"
+          <button hidden={fluid} onClick={onClose} title="Collapse panel"
             style={{width:24,height:24,borderRadius:6,border:`1px solid ${C.border}`,background:C.surface,color:C.textMute,cursor:'pointer',fontSize:14,lineHeight:1}}>
             ×
           </button>
@@ -4162,6 +4245,8 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
   // ── Source diversity check ────────────────────────────────────────────────
   const sourceDiversityWarning = React.useMemo(() => {
     if (items.length < 4) return null;
+    // Official sources (a Civic watch's legislation, bills and rules) are one source by design: not a diversity problem.
+    if (items.filter(a => a.source?.engine === 'civic').length >= items.length / 2) return null;
     const counts = {};
     items.forEach(a => {
       const h = a.source?.domain || (a.url ? new URL(a.url).hostname.replace(/^www\./, '') : '');
@@ -4233,6 +4318,8 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
         const isHover = hoveredIdx === i;
         const wasAdded = addedIdx === i;
         const isNew = !!(prevViewedAt && a.firstSeenAt && new Date(a.firstSeenAt) > new Date(prevViewedAt));
+        const billItem = civicItemOf(a);   // a bill or ordinance from a Civic watch can be followed as a prediction
+        const actW = billItem ? 250 : 176;
         return (
           <div key={a.url||i}
             onMouseEnter={() => setHoveredIdx(i)}
@@ -4246,13 +4333,20 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
               style={{flex:1,minWidth:0,fontSize:12.5,color:C.text,lineHeight:1.4,fontWeight:500,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',textDecoration:'none'}}>
               {title}
             </a>
-            <div style={{flex:'0 0 176px',display:'flex',alignItems:'center',gap:5,justifyContent:'flex-end',width:176}}>
+            <div style={{flex:`0 0 ${actW}px`,display:'flex',alignItems:'center',gap:5,justifyContent:'flex-end',width:actW}}>
               {isHover ? (
                 <div style={{display:'flex',gap:5,width:'100%',justifyContent:'flex-end'}}>
                   <a href={a.url} target="_blank" rel="noopener noreferrer"
                     style={{fontSize:11,fontWeight:700,color:C.textMid,background:'none',border:`1px solid ${C.border}`,borderRadius:5,padding:'3px 8px',cursor:'pointer',textDecoration:'none',whiteSpace:'nowrap',minWidth:64,textAlign:'center'}}>
                     ↗ Open
                   </a>
+                  {billItem && (
+                    <button onClick={e => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('lateral-track-bill', { detail: billItem })); }}
+                      title="Follow this as a prediction, settled from the official record"
+                      style={{fontSize:11,fontWeight:700,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:5,padding:'3px 8px',cursor:'pointer',whiteSpace:'nowrap',textAlign:'center'}}>
+                      Predict
+                    </button>
+                  )}
                   {onAddFromHeadline && (
                     wasAdded
                       ? <span style={{fontSize:11,fontWeight:700,color:'#059669',whiteSpace:'nowrap',display:'inline-block',minWidth:64,textAlign:'center'}}>✓ Added</span>
@@ -5766,6 +5860,824 @@ function LibraryCenter({ keyId, stories, onSelectKey, onFilterStory, onOpenStory
   );
 }
 
+// ── Civic: who represents you, at every level of government ──────────────────
+async function civicJson(pathAndQuery, opts) {
+  try {
+    const r = await fetch('/api/lateral/civic/' + pathAndQuery, opts);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.error) d.error = `HTTP ${r.status}`;
+    return d;
+  } catch (e) { return { error: e.message }; }
+}
+const civicPost = (p, body) => civicJson(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+const civicKey = o => `${o.level}|${o.office}|${o.name}`;
+const CIVIC_LEVELS = [['federal', 'Federal'], ['state', 'State'], ['local', 'City, county and schools']];
+// A bare date like 2026-10-06 is read as UTC midnight, which shows as the day before in US time zones: pin it to local noon.
+const civicDate = d => { try { return d ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T12:00:00' : d).toLocaleDateString() : ''; } catch { return ''; } };
+const SOCIAL_ORDER = ['instagram', 'tiktok', 'twitter', 'facebook', 'youtube', 'mastodon'];
+const SOCIAL_LABEL = { instagram: 'Instagram', tiktok: 'TikTok', twitter: 'X', facebook: 'Facebook', youtube: 'YouTube', mastodon: 'Mastodon' };
+const civicOfficeLine = o => [o.office + (o.district && !/Ward/.test(o.office) ? ' ' + o.district : ''), o.role, o.party].filter(Boolean).join(' · ');
+// Local people in a sensible order: the mayor, the council, then the county, its courts and sheriff, then the school board.
+const civicOrder = o => o.office === 'Mayor' ? 0 : !o.source ? 1 : /^County (Commissioner|Executive)/.test(o.office) ? 2 : /Judge/.test(o.office) ? 3 : /Sheriff/.test(o.office) ? 4 : o.office === 'School Board Member' ? 6 : 5;
+const civicSortLocal = list => list.map((o, i) => [o, i]).sort((a, b) => (civicOrder(a[0]) - civicOrder(b[0])) || (a[1] - b[1])).map(x => x[0]);
+
+// One consistent line-icon set for the profile (drawn to match the app's other icons).
+const CIVIC_ICONS = {
+  mail: <><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4.5 8l7.5 5.5L19.5 8"/></>,
+  phone: <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0122 16.92z" transform="scale(0.9) translate(1.3 1.3)"/>,
+  globe: <><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.5 3.5 5.3 3.5 8.5s-1.1 6-3.5 8.5c-2.4-2.5-3.5-5.3-3.5-8.5S9.6 6 12 3.5z"/></>,
+  form: <><path d="M7 3.5h10a1.5 1.5 0 011.5 1.5v14a1.5 1.5 0 01-1.5 1.5H7A1.5 1.5 0 015.5 19V5A1.5 1.5 0 017 3.5z"/><path d="M9 8h6M9 12h6M9 16h3.5"/></>,
+  wiki: <path d="M3 6h5.5M14.5 6H21M5.5 6l4.3 12L12 11.5 14.2 18 18.5 6"/>,
+  close: <path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>,
+  pin: <><path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 10-13 0C5.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/></>,
+  instagram: <><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></>,
+  tiktok: <><path d="M14 4v10.2a3.7 3.7 0 11-3.7-3.7"/><path d="M14 4c.3 2.3 2 4 4.6 4.2"/></>,
+  twitter: <path d="M5 5l14 14M19 5L5 19"/>,
+  facebook: <path d="M14.8 4.5h-1.7a3.6 3.6 0 00-3.6 3.6V20M7 11.5h8"/>,
+  youtube: <><rect x="3" y="6" width="18" height="12" rx="4"/><path d="M10.5 9.7v4.6l4-2.3z" fill="currentColor"/></>,
+  mastodon: <><path d="M5 9.5C5 7.6 6.5 6 8.5 6h7c2 0 3.5 1.6 3.5 3.5v4c0 2-1.5 3.5-3.5 3.5H12l-4 3v-3c-1.7 0-3-1.3-3-3z"/><path d="M9 13.5v-3.2l3 2.6 3-2.6v3.2"/></>,
+};
+
+// Which map layer an official belongs to (so selecting a person lights up their district).
+function civicLayerFor(o) {
+  if (o.level === 'federal') return /Senator/.test(o.office) ? 'state' : 'congress';
+  if (o.office === 'State Senator') return 'stateSenate';
+  if (o.office === 'State Representative') return 'stateHouse';
+  if (o.level === 'local' && o.source) return o.office === 'Mayor' ? 'place' : o.office === 'School Board Member' ? 'school' : '';   // county offices have no outline here
+  if (o.level === 'local') return /Ward/.test(o.office) ? 'stateSenate' : 'place';
+  return 'state';
+}
+// "Represents": the plain-language area this person speaks for.
+function civicRepresents(o, j) {
+  j = j || {};
+  const st = j.state && j.state.name;
+  if (o.level === 'federal' && /Senator/.test(o.office)) return st ? `All of ${st}` : '';
+  if (o.level === 'federal') return j.congress ? (j.congress.atLarge ? `${st || ''} at-large congressional district` : `${st ? st + '’s ' : ''}${ordinalSuffix(j.congress.district)} congressional district`).trim() : '';
+  if (o.office === 'Governor' || o.office === 'Lieutenant Governor') return st ? `All of ${st}` : '';
+  if (o.office === 'State Senator') return j.stateSenate ? j.stateSenate.name : '';
+  if (o.office === 'State Representative') return j.stateHouse ? j.stateHouse.name : '';
+  if (/Ward/.test(o.office)) return o.office.replace(/^.*, /, '');
+  if (o.level === 'local' && o.source) {
+    if (o.office === 'Mayor') return j.place ? `City of ${j.place.name.replace(/ city$/i, '')}` : '';
+    if (o.office === 'School Board Member') return (j.schoolDistricts && j.schoolDistricts[0] && j.schoolDistricts[0].name) || '';
+    if (/^County/.test(o.office)) return j.county ? j.county.name : '';
+    return '';
+  }
+  if (o.level === 'local') return j.place ? `City of ${j.place.name}` : '';
+  return '';
+}
+const civicInitials = n => { const w = String(n || '').split(/\s+/).filter(x => x && !/^(jr|sr|ii|iii|iv)\.?$/i.test(x)); return ((w[0] || '')[0] || '') + (w.length > 1 ? (w[w.length - 1][0] || '') : ''); };
+
+// Left panel: everyone who represents you, grouped by level.
+function CivicList({ civic, selKey, onSelect }) {
+  if (civic === undefined) return <div style={{padding:'30px 14px',textAlign:'center',color:C.textMute,fontSize:12.5}}>Loading…</div>;
+  if (!civic) return <div style={{padding:'6px 18px',color:C.textMute,fontSize:12.5,lineHeight:1.6}}>Enter your address in the main panel to see who represents you at every level of government.</div>;
+  const officials = civic.officials || [];
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>
+      <div style={{padding:'0 14px 8px',fontSize:12,color:C.textMid,fontWeight:700}}>{civic.label}</div>
+      <div style={{flex:1,overflowY:'auto',padding:'0 10px 10px'}}>
+        {CIVIC_LEVELS.map(([lv, title]) => {
+          const list = lv === 'local' ? civicSortLocal(officials.filter(o => o.level === lv)) : officials.filter(o => o.level === lv);
+          if (!list.length) return null;
+          return (
+            <div key={lv} style={{marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',padding:'4px 4px 5px'}}>{title} · {list.length}</div>
+              {list.map(o => {
+                const k = civicKey(o), on = k === selKey;
+                return (
+                  <button key={k} onClick={() => onSelect(k)}
+                    style={{display:'block',width:'100%',textAlign:'left',background:on ? C.accent + '18' : C.surface,border:`1px solid ${on ? C.accent : C.borderLight}`,borderRadius:8,padding:'7px 10px',marginBottom:5,cursor:'pointer'}}>
+                    <div style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35}}>{o.name}</div>
+                    <div style={{fontSize:10.5,color:C.textMute,marginTop:1}}>{civicOfficeLine(o)}</div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{padding:'8px 14px 58px',borderTop:`1px solid ${C.border}`,fontSize:11,color:C.textMute}}>{officials.length} officials · checked {civicDate(civic.asOf)}</div>
+    </div>
+  );
+}
+
+// The portrait: fetched and cached by Lateral's server; initials when there is no photo.
+function CivicPhoto({ k, name, size = 124 }) {
+  const [bad, setBad] = useState(false);
+  useEffect(() => { setBad(false); }, [k]);
+  if (bad) return <div className="cv-photo cv-initials" style={{width:size,height:size,fontSize:Math.round(size * 0.34)}} aria-label={name}>{civicInitials(name)}</div>;
+  return <img className="cv-photo" src={'/api/lateral/civic/photo?key=' + encodeURIComponent(k)} alt={name} onError={() => setBad(true)} style={{width:size,height:size}}/>;
+}
+
+// Recent videos and posts from accounts that publish free public feeds (YouTube, Mastodon).
+function CivicPosts({ k }) {
+  const [d, setD] = useState(null);
+  useEffect(() => { let on = true; setD(null); civicJson('posts?key=' + encodeURIComponent(k)).then(x => { if (on) setD(x); }); return () => { on = false; }; }, [k]);
+  return (
+    <div>
+      {!d && <div style={{fontSize:12,color:C.textMute}}>Loading…</div>}
+      {d && d.error && <div style={{fontSize:12,color:'#991b1b'}}>{d.error}</div>}
+      {d && !d.error && d.items.length === 0 && <div style={{fontSize:12,color:C.textMute}}>{(d.notes || []).join(' ') || 'Nothing recent.'}</div>}
+      {d && !d.error && d.items.map((it, i) => (
+        <a key={i} className="cv-vid" href={it.url} target="_blank" rel="noreferrer">
+          {it.thumb ? <img src={it.thumb} alt="" referrerPolicy="no-referrer"/> : <i/>}
+          <div style={{minWidth:0}}><b>{it.title}</b><span>{SOCIAL_LABEL[it.platform]} · {civicDate(it.date)}</span></div>
+        </a>
+      ))}
+      {d && !d.error && (d.notes || []).length > 0 && d.items.length > 0 && <div style={{fontSize:11,color:C.textMute,marginTop:6}}>{d.notes.join(' ')}</div>}
+      <div style={{fontSize:10.5,color:C.textMute,marginTop:8,lineHeight:1.5}}>From the accounts' public feeds; thumbnails load from YouTube. Instagram, TikTok, X and Facebook offer no free way to read posts, so those are links only.</div>
+    </div>
+  );
+}
+
+// Right column when nobody is selected.
+function CivicProfileEmpty({ hasProfile }) {
+  return (
+    <div style={{padding:'70px 28px',textAlign:'center'}}>
+      <div style={{width:54,height:54,borderRadius:16,margin:'0 auto 16px',display:'flex',alignItems:'center',justifyContent:'center',background:C.accent + '18',color:C.accent}}><LIcon size={26}>{ICONS.civic}</LIcon></div>
+      <div style={{fontFamily:"'Playfair Display', Georgia, serif",fontSize:18,fontWeight:900,color:C.text,marginBottom:8}}>Profile</div>
+      <div style={{fontSize:12.5,color:C.textMute,lineHeight:1.65}}>{hasProfile ? 'Pick someone from the list, the map or the overview to see their portrait, contact details, social accounts and recent videos.' : 'Once you add your address, pick anyone who represents you to see their full profile here.'}</div>
+    </div>
+  );
+}
+
+// A whole profile for one official, in the right-hand column.
+function CivicProfile({ o, civic, onClose, onUpdate }) {
+  const key = civicKey(o);
+  const j = civic.jurisdictions || {};
+  const [about, setAbout] = useState(undefined);   // undefined = loading, then { found, … }
+  const [adding, setAdding] = useState(null);
+  const [handle, setHandle] = useState('');
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [found, setFound] = useState(null);
+  useEffect(() => {
+    let on = true;
+    setAbout(undefined); setAdding(null); setHandle(''); setErr(''); setFound(null);
+    civicJson('about?key=' + encodeURIComponent(key)).then(d => { if (on) setAbout(d.error ? { found: false } : d); });
+    return () => { on = false; };
+  }, [key]);
+
+  const accounts = o.social || [];
+  const have = new Set(accounts.map(a => a.platform));
+  const missing = SOCIAL_ORDER.filter(p => !have.has(p));
+  const searchable = ['tiktok', 'instagram'].filter(p => !have.has(p));
+  const shortName = o.name.split(/\s+/).slice(-1)[0];
+  const represents = civicRepresents(o, j);
+
+  async function save(platform, value, source) {
+    setBusy('save'); setErr('');
+    const d = await civicPost('social/set', { key, platform, handle: value, source });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    onUpdate(d.profile); setAdding(null); setHandle('');
+    if (found) setFound({ ...found, candidates: (found.candidates || []).filter(c => c.platform !== platform) });
+  }
+  async function drop(platform) { const d = await civicPost('social/remove', { key, platform }); if (!d.error) onUpdate(d.profile); }
+  async function search() {
+    setBusy('search'); setErr(''); setFound(null);
+    const d = await civicPost('social/discover', { key, platforms: searchable });
+    setBusy('');
+    if (d.error) setErr(d.error); else setFound(d);
+  }
+
+  const actions = [
+    o.email && { href: 'mailto:' + o.email, icon: CIVIC_ICONS.mail, label: 'Email' },
+    o.phone && { href: 'tel:' + o.phone.replace(/[^0-9+]/g, ''), icon: CIVIC_ICONS.phone, label: 'Call' },
+    o.website && { href: o.website, icon: CIVIC_ICONS.globe, label: 'Website', ext: true },
+    !o.email && o.contactForm && { href: o.contactForm, icon: CIVIC_ICONS.form, label: 'Contact', ext: true },
+    about && about.found && { href: about.url, icon: CIVIC_ICONS.wiki, label: 'Wikipedia', ext: true },
+  ].filter(Boolean);
+  const facts = [
+    ['Represents', represents],
+    o.termEnds ? ['Term ends', civicDate(o.termEnds)] : null,
+    o.nextElection && o.level === 'federal' ? ['Next election', String(o.nextElection)] : null,
+    o.body ? ['Body', o.body] : null,
+  ].filter(f => f && f[1]);
+
+  return (
+    <div className="fade-in">
+      <div className="cv-hero">
+        <button className="cv-close" onClick={onClose} title="Close profile"><LIcon size={15}>{CIVIC_ICONS.close}</LIcon></button>
+        <CivicPhoto k={key} name={o.name}/>
+        <div className="cv-name">{o.name}</div>
+        <div className="cv-office">{o.office}{o.district && !/Ward/.test(o.office) ? ' · District ' + o.district : ''}</div>
+        <div className="cv-chips">
+          {o.party && <span className="cv-chip">{o.party}</span>}
+          {o.role && <span className="cv-chip">{o.role}</span>}
+          {o.upForElection && <span className="cv-chip warn">On the ballot {o.nextElection}</span>}
+        </div>
+      </div>
+
+      <div className="cv-body">
+        {actions.length > 0 && (
+          <div className="cv-sec"><div className="cv-acts">
+            {actions.map(a => <a key={a.label} className="cv-act" href={a.href} {...(a.ext ? { target: '_blank', rel: 'noreferrer' } : {})}><LIcon size={18}>{a.icon}</LIcon>{a.label}</a>)}
+          </div></div>
+        )}
+
+        {facts.length > 0 && (
+          <div className="cv-sec"><div className="cv-h">At a glance</div>
+            <dl className="cv-facts">{facts.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+          </div>
+        )}
+
+        {about && about.found && about.extract && (
+          <div className="cv-sec"><div className="cv-h">About</div>
+            <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.65}}>{about.extract}</div>
+            <a href={about.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:7,fontSize:11.5,fontWeight:700,color:C.accent,textDecoration:'none'}}>Read on Wikipedia →</a>
+            <div style={{fontSize:10.5,color:C.textMute,marginTop:3}}>Text from Wikipedia, under CC BY-SA.</div>
+          </div>
+        )}
+        {about === undefined && <div className="cv-sec"><div className="cv-h">About</div><div style={{fontSize:12,color:C.textMute}}>Looking for a Wikipedia article…</div></div>}
+
+        <div className="cv-sec">
+          <div className="cv-h">Social media</div>
+          <div className="cv-grid">
+            {accounts.map(a => (
+              <div key={a.platform} className="cv-tile">
+                <a className="cv-tile-a" href={a.url} target="_blank" rel="noreferrer" title={`Open ${a.label}`}>
+                  <span className="cv-ico"><LIcon size={16}>{CIVIC_ICONS[a.platform]}</LIcon></span>
+                  <span className="cv-tx"><b>{a.label}</b><span>{a.platform === 'mastodon' ? a.handle : '@' + a.handle}</span></span>
+                </a>
+                {a.source !== 'dataset' && <button className="cv-x" onClick={() => drop(a.platform)} title={`Remove (${a.source === 'search' ? 'found by search' : 'added by you'})`}><LIcon size={11}>{CIVIC_ICONS.close}</LIcon></button>}
+              </div>
+            ))}
+            {missing.map(p => (
+              <div key={p} className="cv-tile cv-ghost">
+                <button className="cv-tile-a" onClick={() => { setAdding(p); setHandle(''); setErr(''); }} title={`Add a ${SOCIAL_LABEL[p]} account`}>
+                  <span className="cv-ico"><LIcon size={16}>{CIVIC_ICONS[p]}</LIcon></span>
+                  <span className="cv-tx"><b>{SOCIAL_LABEL[p]}</b><span>Add account</span></span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {adding && (
+            <div style={{display:'flex',gap:7,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
+              <input value={handle} autoFocus onChange={e => setHandle(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && handle.trim()) save(adding, handle, 'manual'); if (e.key === 'Escape') { setAdding(null); setHandle(''); } }}
+                placeholder={adding === 'mastodon' ? '@name@server.social' : `${SOCIAL_LABEL[adding]} handle or address`} style={{...inputStyle,fontSize:12.5,padding:'7px 10px',flex:'1 1 150px',minWidth:0}}/>
+              <Btn onClick={() => save(adding, handle, 'manual')} disabled={!!busy || !handle.trim()} style={{padding:'7px 12px',fontSize:12}}>Save</Btn>
+              <button onClick={() => { setAdding(null); setHandle(''); setErr(''); }} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12}}>Cancel</button>
+            </div>
+          )}
+          {err && <div style={{marginTop:9,fontSize:12,color:'#991b1b',lineHeight:1.5}}>{err}</div>}
+
+          {searchable.length > 0 && !adding && (
+            <div style={{marginTop:11}}>
+              <button className="cv-act" onClick={search} disabled={!!busy} style={{flexDirection:'row',gap:8,width:'100%',padding:'9px 10px'}}>
+                <LIcon size={15}>{ICONS.search}</LIcon>{busy === 'search' ? 'Searching the web…' : `Find ${searchable.map(p => SOCIAL_LABEL[p]).join(' and ')} on the web`}
+              </button>
+              <div style={{fontSize:10.5,color:C.textMute,marginTop:5,lineHeight:1.5}}>Uses {searchable.length} Tavily credit{searchable.length > 1 ? 's' : ''}. Nothing is saved until you confirm a match.</div>
+            </div>
+          )}
+          {found && (
+            <div style={{marginTop:12}}>
+              {found.searched.map(p => {
+                const list = (found.candidates || []).filter(c => c.platform === p);
+                const good = list.filter(c => c.handleMatch);
+                return (
+                  <div key={p} style={{marginBottom:10}}>
+                    <div className="cv-tag" style={{marginBottom:3}}>{SOCIAL_LABEL[p]}</div>
+                    {list.length === 0 && <div style={{fontSize:12,color:C.textMute}}>Nothing found.</div>}
+                    {list.length > 0 && good.length === 0 && <div style={{fontSize:11.5,color:'#92400e',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:8,padding:'6px 9px',margin:'3px 0 4px',lineHeight:1.5}}>No {SOCIAL_LABEL[p]} account with {shortName}'s name turned up. These only mention {o.name}, so they are probably not official.</div>}
+                    {list.map(c => (
+                      <div key={c.handle} className="cv-cand">
+                        <div style={{minWidth:0,flex:1}}>
+                          <a href={c.url} target="_blank" rel="noreferrer" style={{fontSize:12.5,fontWeight:800,color:C.accent,textDecoration:'none'}}>@{c.handle}</a>
+                          {c.handleMatch && <span className="cv-chip" style={{marginLeft:7,padding:'1px 7px',fontSize:10,background:'#dcfce7',borderColor:'#86efac',color:'#166534'}}>name matches</span>}
+                          <div style={{fontSize:11,color:C.textMute,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.title}</div>
+                        </div>
+                        <Btn variant="secondary" onClick={() => save(c.platform, c.handle, 'search')} disabled={!!busy} style={{padding:'4px 10px',fontSize:11.5}}>Use</Btn>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              <div style={{fontSize:10.5,color:C.textMute}}>Open each link to check it first. Used {found.credits} Tavily credit{found.credits === 1 ? '' : 's'}.</div>
+            </div>
+          )}
+        </div>
+
+        {(have.has('youtube') || have.has('mastodon')) && <div className="cv-sec"><div className="cv-h">Recent videos and posts</div><CivicPosts k={key}/></div>}
+
+        {(o.address || o.email || o.phone) && (
+          <div className="cv-sec"><div className="cv-h">Contact details</div>
+            <dl className="cv-facts">
+              {o.email && <><dt>Email</dt><dd><a href={'mailto:' + o.email} style={{color:C.accent,textDecoration:'none',fontWeight:700}}>{o.email}</a></dd></>}
+              {o.phone && <><dt>Phone</dt><dd>{o.phone}</dd></>}
+              {o.address && <><dt>Office</dt><dd>{o.address}</dd></>}
+            </dl>
+          </div>
+        )}
+
+        <div className="cv-sec" style={{fontSize:10.5,color:C.textMute,lineHeight:1.6}}>
+          {o.sourceNote ? o.sourceNote + ' ' : ''}{o.sourceUrl ? <>Source: <a href={o.sourceUrl} target="_blank" rel="noreferrer" style={{color:C.textMid}}>{o.sourceUrl.replace(/^https?:\/\//, '').slice(0, 60)}</a> · </> : null}checked {civicDate(o.asOf)}. Photos are fetched and kept by Lateral on this computer. People move and seats change; "Re-check officials" refreshes this.
+          {o.source && (
+            <div style={{marginTop:8}}>
+              <button onClick={async () => { const d = await civicPost('office/remove', { key }); if (!d.error) { onUpdate(d.profile); onClose && onClose(); } }}
+                style={{background:'none',border:'none',cursor:'pointer',color:'#991b1b',fontSize:11.5,fontWeight:700,padding:0}}>Remove {o.name.split(' ')[0]} from my list</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Outlines of your districts, drawn on this computer from public Census boundaries: no map service is contacted, so nothing
+// reveals which area you are looking at.
+const MAP_ORDER = ['state', 'school', 'place', 'stateSenate', 'stateHouse', 'congress', 'congressNext'];
+function CivicMap({ civic, onSelect, selKey }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [on, setOn] = useState({ congress: true, place: true });
+  const [hover, setHover] = useState('');
+  useEffect(() => {
+    let alive = true;
+    civicJson('shapes').then(d => {
+      if (!alive) return;
+      if (d.error) { setErr(d.error); return; }
+      setData(d);
+      if (d.boundaryChange) setOn(o => ({ ...o, congressNext: true }));
+    });
+    return () => { alive = false; };
+  }, [civic && civic.asOf]);
+  const officials = (civic && civic.officials) || [];
+  const selOfficial = selKey ? officials.find(o => civicKey(o) === selKey) : null;
+  const selId = selOfficial ? civicLayerFor(selOfficial) : '';
+  // Selecting someone switches their district's outline on.
+  useEffect(() => { if (selId) setOn(o => (o[selId] ? o : { ...o, [selId]: true })); }, [selId]);
+  const T = {
+    state: { color: '#9ca3af', fill: 0.18, label: 'State' },
+    school: { color: '#16a34a', fill: 0.12, label: 'School district' },
+    place: { color: '#7c3aed', fill: 0.16, label: 'City' },
+    stateSenate: { color: '#0ea5e9', fill: 0.10, label: 'State senate' },
+    stateHouse: { color: '#f59e0b', fill: 0.16, label: 'State house' },
+    congress: { color: C.accent, fill: 0.16, label: 'Congress' },
+    congressNext: { color: '#dc2626', fill: 0, label: 'Congress, new map', dash: '7 5' },
+  };
+  if (err) return <div style={{fontSize:12.5,color:C.textMute,lineHeight:1.6}}>The map could not be loaded ({err}). Everything else on this page still works.</div>;
+  if (!data) return <div style={{fontSize:12.5,color:C.textMute}}>Loading outlines…</div>;
+  const layers = MAP_ORDER.map(id => (data.layers || []).find(l => l.id === id)).filter(Boolean);
+  const ringsOf = g => !g ? [] : g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : [];
+  const shown = layers.filter(l => on[l.id]);
+  const fit = shown.filter(l => l.id !== 'state').length ? shown.filter(l => l.id !== 'state') : shown;
+  const W = 640, H = 400, PAD = 14;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  fit.forEach(l => ringsOf(l.geometry).forEach(r => r.forEach(([x, y]) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; })));
+  const ready = isFinite(minX);
+  const kx = ready ? Math.cos(((minY + maxY) / 2) * Math.PI / 180) : 1;
+  const spanX = ready ? Math.max((maxX - minX) * kx, 1e-6) : 1, spanY = ready ? Math.max(maxY - minY, 1e-6) : 1;
+  const s = Math.min((W - 2 * PAD) / spanX, (H - 2 * PAD) / spanY);
+  const ox = (W - spanX * s) / 2, oy = (H - spanY * s) / 2;
+  const pathOf = g => ringsOf(g).map(r => r.map(([x, y], i) => (i ? 'L' : 'M') + (ox + (x - minX) * kx * s).toFixed(1) + ' ' + (oy + (maxY - y) * s).toFixed(1)).join('') + 'Z').join('');
+  const whoFor = id => id === 'congress' || id === 'congressNext' ? officials.find(o => o.level === 'federal' && /Representative|Delegate/.test(o.office))
+    : id === 'stateSenate' ? officials.find(o => o.office === 'State Senator') : id === 'stateHouse' ? officials.find(o => o.office === 'State Representative') : id === 'place' ? officials.find(o => o.office === 'Mayor') : null;
+  const hovered = layers.find(l => l.id === hover);
+  const lit = id => hover === id || selId === id;
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',height:'auto',display:'block',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}} role="img" aria-label="Outlines of your districts">
+        {ready && layers.filter(l => on[l.id]).map(l => (
+          <path key={l.id} d={pathOf(l.geometry)} fillRule="evenodd" fill={T[l.id].color} fillOpacity={lit(l.id) ? T[l.id].fill + 0.18 : T[l.id].fill}
+            stroke={T[l.id].color} strokeWidth={(l.id === 'congress' || l.id === 'congressNext' ? 2.2 : 1.5) + (selId === l.id ? 1 : 0)} strokeDasharray={T[l.id].dash} strokeLinejoin="round"
+            onMouseEnter={() => setHover(l.id)} onMouseLeave={() => setHover('')}><title>{l.label}</title></path>
+        ))}
+        {!ready && <text x={W / 2} y={H / 2} textAnchor="middle" fill={C.textMute} fontSize="13">Turn a layer on to see it.</text>}
+        {hovered && <text x="12" y="22" fill={C.text} fontSize="13" fontWeight="700">{hovered.label}</text>}
+      </svg>
+      <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:10}}>
+        {layers.map(l => {
+          const who = whoFor(l.id);
+          const whoOn = who && civicKey(who) === selKey;
+          return (
+            <div key={l.id} style={{display:'flex',alignItems:'center',gap:8,fontSize:12.5}} onMouseEnter={() => setHover(l.id)} onMouseLeave={() => setHover('')}>
+              <button onClick={() => setOn(o => ({ ...o, [l.id]: !o[l.id] }))} title={on[l.id] ? 'Hide this outline' : 'Show this outline'}
+                style={{display:'inline-flex',alignItems:'center',gap:7,background:'none',border:'none',cursor:'pointer',padding:'2px 0',color:on[l.id] ? C.text : C.textMute,fontWeight:700,fontSize:12.5}}>
+                <span style={{width:14,height:14,borderRadius:3,border:`2px ${T[l.id].dash ? 'dashed' : 'solid'} ${T[l.id].color}`,background:on[l.id] ? T[l.id].color + '55' : 'transparent',flexShrink:0}}/>
+                {l.label}
+              </button>
+              {who && <button onClick={() => onSelect(civicKey(who))} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,fontWeight:whoOn ? 900 : 700,textDecoration:whoOn ? 'underline' : 'none',padding:0}}>{who.name} →</button>}
+            </div>
+          );
+        })}
+      </div>
+      {data.boundaryChange && <div style={{marginTop:10,fontSize:12,color:'#92400e',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:8,padding:'7px 10px',lineHeight:1.5}}>The congressional boundaries are being redrawn. The dashed red outline is the new map for the next Congress; it differs from the current one (solid), so your representation could change in January.</div>}
+      <div style={{fontSize:11,color:C.textMute,marginTop:8,lineHeight:1.5}}>Outlines only, drawn on this computer from Census boundaries. No map service is contacted, so nothing reveals where you are looking. Your address is not used or stored.</div>
+    </div>
+  );
+}
+
+// What to watch: each switch creates an ordinary story that Lateral keeps up to date and alerts on. Some sources use an optional
+// free key, set up here the way the Tavily key is.
+function CivicWatch({ civicAsOf, onAddStory, onOpenStory }) {
+  const [d, setD] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState({});
+  const [topics, setTopics] = useState('');
+  const [keyOpen, setKeyOpen] = useState('');
+  const [keyVal, setKeyVal] = useState('');
+  const [keyNote, setKeyNote] = useState('');
+  const card = {background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'14px 16px',marginBottom:14};
+  const eyebrow = {fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:8};
+  const load = () => civicJson('watch/list').then(x => { if (!x.error) { setD(x); setTopics(t => t || (x.topics || []).join(', ')); } });
+  useEffect(() => { load(); }, [civicAsOf]);
+  const say = (id, text) => setMsg(m => ({ ...m, [id]: text }));
+  const topicList = () => topics.split(',').map(t => t.trim()).filter(Boolean).slice(0, 5);
+
+  async function start(w) {
+    setBusy(w.id); say(w.id, '');
+    const rules = w.id === 'rules', list = topicList();
+    if (rules && !list.length) { say(w.id, 'Type at least one topic first, for example: broadband, Lake Erie'); setBusy(''); return; }
+    if (rules) { const r = await civicPost('watch/topics', { topics: list }); if (r.error) { say(w.id, r.error); setBusy(''); return; } }
+    // Look first, so a source that is down or needs a key never leaves an empty story behind.
+    const probe = await civicJson(`watch/items?kind=${w.id}&fresh=1`);
+    if (probe.error) { say(w.id, probe.error); if (probe.needsKey) { setKeyOpen(probe.needsKey); setKeyNote(''); } setBusy(''); return; }
+    const story = {
+      id: uid(), status: 'active', civicWatch: w.id, createdAt: now(), updatedAt: now(), episodes: [],
+      title: rules ? `Federal rules: ${list.join(', ')}` : w.title,
+      summary: rules ? `Follows federal proposed and final rules about ${list.join(', ')}, with public-comment deadlines, from the Federal Register, plus news. Part of your Civic profile.` : w.summary,
+      tags: rules ? ['civic', 'federal rules', ...list.slice(0, 3)] : w.tags, actors: w.actors || [],
+    };
+    onAddStory(story);
+    const lk = await civicPost('watch/link', { kind: w.id, storyId: story.id, topics: rules ? list : undefined });
+    if (lk.error) say(w.id, lk.error);
+    setCacheEntry(story.id, 'headlines', { items: probe.items || [], videos: [], socials: [], queries: [], filtered: [] });
+    setBusy(''); load();
+  }
+  async function stop(w) { await civicPost('watch/unlink', { kind: w.id }); load(); }
+  async function saveKey(which) {
+    setKeyNote('Saving…');
+    const r = await civicPost('watch/key', { which, key: keyVal });
+    if (r.error) { setKeyNote(r.error); return; }
+    if (keyVal.trim()) { const t = await civicPost('watch/key/test', { which }); setKeyNote(t.ok ? 'Saved, and it works.' : `Saved, but: ${t.error || 'it did not check out.'}`); }
+    else setKeyNote('Removed.');
+    setKeyVal(''); load();
+  }
+
+  if (!d || !d.hasProfile) return null;
+  const KEY_HELP = {
+    congress: { name: 'Congress.gov', steps: 'Request a free key at the page below (it is emailed to you within a minute), then paste it here.' },
+    openstates: { name: 'Open States', steps: 'Sign in (or sign up, free) at the page below. Your API key is shown on your profile page. Paste it here.' },
+  };
+  return (
+    <div style={card}>
+      <div style={eyebrow}>Watching</div>
+      <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.6,marginBottom:6}}>Switch on what you want to follow. Each one becomes a story in your list, kept up to date, and Lateral alerts you when a bill moves, a meeting is tomorrow, or a public-comment period is closing (choose where in Settings → Alerts).</div>
+      {d.watches.map(w => {
+        const ks = w.keyKind ? d.keys[w.keyKind] : null, help = w.keyKind ? KEY_HELP[w.keyKind] : null;
+        return (
+          <div key={w.id} style={{padding:'12px 0',borderTop:`1px solid ${C.borderLight}`}}>
+            <div style={{display:'flex',gap:12,alignItems:'flex-start',flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 260px',minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text}}>{w.id === 'rules' && w.watching && d.topics.length ? `Federal rules: ${d.topics.join(', ')}` : w.title}</div>
+                <div style={{fontSize:12,color:C.textMute,lineHeight:1.55,marginTop:2}}>{w.blurb}</div>
+              </div>
+              <div style={{flexShrink:0,display:'flex',gap:6,alignItems:'center'}}>
+                {w.watching ? (
+                  <>
+                    <span style={{fontSize:11.5,fontWeight:800,color:'#166534'}}>✓ Watching</span>
+                    <Btn variant="secondary" onClick={() => onOpenStory(w.storyId)} style={{padding:'5px 10px',fontSize:11.5}}>Open story</Btn>
+                    <Btn variant="ghost" onClick={() => stop(w)} style={{padding:'5px 10px',fontSize:11.5}}>Stop</Btn>
+                  </>
+                ) : <Btn onClick={() => start(w)} disabled={!!busy || !w.available} style={{padding:'6px 14px',fontSize:12}}>{busy === w.id ? 'Starting…' : 'Watch'}</Btn>}
+              </div>
+            </div>
+            {w.id === 'rules' && !w.watching && (
+              <input value={topics} onChange={e => setTopics(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') start(w); }} placeholder="Topics, separated by commas (for example: broadband, Lake Erie)" style={{...inputStyle,fontSize:12.5,padding:'6px 10px',marginTop:8}}/>
+            )}
+            {msg[w.id] && <div style={{marginTop:7,fontSize:12,color:'#991b1b',lineHeight:1.5}}>{msg[w.id]}</div>}
+            {w.watching && w.id === 'rules' && <div style={{marginTop:6,fontSize:11.5,color:C.textMute}}>To change the topics, stop this watch and start it again.</div>}
+            {ks && (
+              <div style={{marginTop:7,fontSize:11.5,color:C.textMute,lineHeight:1.55}}>
+                {ks.configured ? `Using your ${help.name} key. ` : ks.usesDemo ? `Using a shared demo key, limited to about 10 requests an hour. ` : `Needs a free ${help.name} key. `}
+                <button onClick={() => { setKeyOpen(keyOpen === w.keyKind ? '' : w.keyKind); setKeyNote(''); setKeyVal(''); }} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:11.5,padding:0}}>{ks.configured ? 'Change or remove' : 'Add a free key'}</button>
+              </div>
+            )}
+            {ks && keyOpen === w.keyKind && (
+              <div style={{marginTop:9,padding:'11px 12px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+                <div style={{fontSize:12,color:C.textMid,lineHeight:1.6,marginBottom:8}}>{help.steps}<br/><a href={ks.signup} target="_blank" rel="noreferrer" style={{color:C.accent,fontWeight:700,textDecoration:'none'}}>{ks.signup.replace(/^https?:\/\//, '')} →</a></div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                  <input value={keyVal} onChange={e => setKeyVal(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && keyVal.trim()) saveKey(w.keyKind); }} placeholder={ks.configured ? 'Paste a new key, or leave empty to remove' : 'Paste your key'} style={{...inputStyle,fontSize:12.5,padding:'6px 10px',flex:'1 1 220px',minWidth:0}} autoComplete="off" spellCheck={false}/>
+                  <Btn onClick={() => saveKey(w.keyKind)} disabled={!keyVal.trim() && !ks.configured} style={{padding:'6px 12px',fontSize:12}}>{keyVal.trim() || !ks.configured ? 'Save and check' : 'Remove key'}</Btn>
+                  <button onClick={() => { setKeyOpen(''); setKeyNote(''); }} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12}}>Close</button>
+                </div>
+                {keyNote && <div style={{marginTop:8,fontSize:12,color:/works|Saved\.|Removed/.test(keyNote) ? '#166534' : '#991b1b'}}>{keyNote}</div>}
+                <div style={{fontSize:11,color:C.textMute,marginTop:8,lineHeight:1.5}}>The key stays on this computer and is never included in exports.</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Center panel: first-time setup, or the overview (districts, map, who was found). A person's full profile opens in the right column.
+// Mayor, county, courts, sheriff and school board: found with the free sources that exist, or with an opt-in web search, and always
+// confirmed (or typed) by the person.
+function CivicOffices({ civic, onChange, onSelect, card, eyebrow }) {
+  const cat = (civic.offices && civic.offices.catalog) || [];
+  const presets = (civic.offices && civic.offices.presets) || [];
+  const people = civic.officials || [];
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [found, setFound] = useState(null);       // a search result: { id, answer, sources, candidates, note, credits }
+  const [pick, setPick] = useState({});
+  const [form, setForm] = useState(null);         // a hand entry: { id, office, name, email, phone, website }
+  const keyOf = o => civicKey(o);
+  const reset = () => { setFound(null); setPick({}); setForm(null); setErr(''); };
+
+  async function search(id) {
+    reset(); setBusy('search:' + id);
+    const d = await civicPost('office/discover', { officeId: id });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    setFound({ ...d, id });
+    setPick(Object.fromEntries((d.candidates || []).map(c => [c.name, (d.candidates || []).length === 1])));
+  }
+  async function confirm() {
+    const chosen = found.candidates.filter(c => pick[c.name]);
+    if (!chosen.length) return;
+    setBusy('save');
+    const d = await civicPost('office/add', { officeId: found.id, source: 'search', people: chosen.map(c => ({ name: c.name, role: c.role, sourceUrl: c.sourceUrl })) });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    onChange(d.profile); reset();
+  }
+  async function saveForm() {
+    setBusy('save'); setErr('');
+    const isCat = cat.some(c => c.id === form.id);
+    const d = await civicPost('office/add', { source: 'manual', ...(isCat ? { officeId: form.id } : { office: form.office === 'Other' ? form.other : form.office }), name: form.name, email: form.email, phone: form.phone, website: form.website });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    onChange(d.profile); reset();
+  }
+  async function lookAgain(id) {
+    setBusy('restore'); setErr('');
+    const d = await civicPost('office/restore', { officeId: id });
+    setBusy('');
+    if (d.error) setErr(d.error); else onChange(d.profile);
+  }
+  const mini = {padding:'5px 11px',fontSize:12};
+  const chip = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12,fontWeight:700,color:C.text,background:C.bg,border:`1px solid ${C.border}`,borderRadius:14,padding:'3px 10px',cursor:'pointer'};
+
+  return (
+    <div style={card}>
+      <div style={eyebrow}>Other local offices</div>
+      <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.6,marginBottom:10}}>
+        The mayor is read from Wikidata automatically. For the county, its courts, the sheriff and your school board there is no single free list for every place, so Lateral can search the web for you (one Tavily credit each) and show what it found with its sources. Nothing is saved until you confirm it, and you can always add someone by hand.
+      </div>
+      {cat.map(c => {
+        const mine = people.filter(o => o.officeId === c.id);
+        const isOpen = found && found.id === c.id, isForm = form && form.id === c.id;
+        return (
+          <div key={c.id} style={{padding:'10px 0',borderTop:`1px solid ${C.borderLight}`}}>
+            <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text}}>{c.title}</div>
+              {!c.available && <span style={{fontSize:11.5,color:C.textMute}}>{c.hint}</span>}
+            </div>
+            {mine.length > 0 && <div style={{display:'flex',gap:6,flexWrap:'wrap',margin:'7px 0 2px'}}>{mine.map(o => <button key={keyOf(o)} style={chip} onClick={() => onSelect(keyOf(o))} title={o.sourceNote || ''}>{o.name}{o.role ? <span style={{fontWeight:500,color:C.textMute}}> · {o.role}</span> : null}</button>)}</div>}
+            {mine.length === 0 && c.available && <div style={{fontSize:12,color:C.textMute,marginTop:3}}>{c.dismissed ? 'You removed this one.' : c.via === 'wikidata' ? 'Nobody found on Wikidata for your city.' : 'Nobody on file yet.'}</div>}
+            {c.available && !isOpen && !isForm && (
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:7,alignItems:'center'}}>
+                {c.via === 'search' && <Btn variant="secondary" onClick={() => search(c.id)} disabled={!!busy} style={mini}>{busy === 'search:' + c.id ? 'Searching the web…' : mine.length ? 'Search again' : 'Find with a web search'}</Btn>}
+                {c.via === 'wikidata' && c.dismissed && <Btn variant="secondary" onClick={() => lookAgain(c.id)} disabled={!!busy} style={mini}>Look on Wikidata again</Btn>}
+                <Btn variant="ghost" onClick={() => { reset(); setForm({ id: c.id, name: '', email: '', phone: '', website: '' }); }} disabled={!!busy} style={mini}>{c.multi || !mine.length ? 'Add by hand' : 'Replace by hand'}</Btn>
+                {c.via === 'search' && busy !== 'search:' + c.id && <span style={{fontSize:11,color:C.textMute}}>1 Tavily credit</span>}
+              </div>
+            )}
+            {isOpen && (
+              <div style={{marginTop:9,background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8,padding:'10px 12px'}}>
+                {found.answer && <div style={{fontSize:12.5,color:C.text,lineHeight:1.6,marginBottom:8}}>{found.answer}</div>}
+                {found.note && <div style={{fontSize:11.5,color:'#92400e',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:8,padding:'6px 9px',marginBottom:8,lineHeight:1.5}}>{found.note}</div>}
+                {found.candidates.length > 0 && (
+                  <div style={{marginBottom:8}}>
+                    <div className="cv-tag" style={{marginBottom:4}}>Found in the results · tick the ones that are right</div>
+                    {found.candidates.map(cd => (
+                      <label key={cd.name} style={{display:'flex',alignItems:'baseline',gap:8,fontSize:12.5,padding:'3px 0',cursor:'pointer'}}>
+                        <input type="checkbox" checked={!!pick[cd.name]} onChange={e => setPick(p => ({ ...p, [cd.name]: e.target.checked }))}/>
+                        <span style={{fontWeight:700,color:C.text}}>{cd.name}</span>
+                        {cd.role && <span style={{color:C.textMute}}>{cd.role}</span>}
+                        {cd.sourceUrl && <a href={cd.sourceUrl} target="_blank" rel="noreferrer" style={{marginLeft:'auto',fontSize:11,color:C.accent,textDecoration:'none',fontWeight:700}}>source ↗</a>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {found.sources.length > 0 && (
+                  <div style={{fontSize:11,color:C.textMute,lineHeight:1.6,marginBottom:8}}>Sources: {found.sources.slice(0, 5).map((s, i) => <React.Fragment key={i}>{i ? ' · ' : ''}<a href={s.url} target="_blank" rel="noreferrer" style={{color:C.textMid}}>{s.title.slice(0, 40) || s.url.replace(/^https?:\/\//, '').slice(0, 30)}</a></React.Fragment>)}</div>
+                )}
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                  {found.candidates.length > 0 && <Btn onClick={confirm} disabled={!!busy || !found.candidates.some(cd => pick[cd.name])} style={mini}>{busy === 'save' ? 'Saving…' : 'Add the ticked ones'}</Btn>}
+                  <Btn variant="ghost" onClick={() => { const id = c.id; reset(); setForm({ id, name: '', email: '', phone: '', website: '' }); }} style={mini}>Add by hand instead</Btn>
+                  <button onClick={reset} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12}}>Close</button>
+                  <span style={{fontSize:11,color:C.textMute}}>Used {found.credits} Tavily credit. Open the sources to check before you add anyone.</span>
+                </div>
+              </div>
+            )}
+            {isForm && <CivicOfficeForm form={form} setForm={setForm} presets={presets} fixed busy={busy === 'save'} onSave={saveForm} onCancel={reset}/>}
+          </div>
+        );
+      })}
+      <div style={{padding:'10px 0 0',borderTop:`1px solid ${C.borderLight}`}}>
+        {form && form.id === 'other'
+          ? <CivicOfficeForm form={form} setForm={setForm} presets={presets} busy={busy === 'save'} onSave={saveForm} onCancel={reset}/>
+          : <Btn variant="ghost" onClick={() => { reset(); setForm({ id: 'other', office: 'County Auditor', other: '', name: '', email: '', phone: '', website: '' }); }} disabled={!!busy} style={mini}>Add another local official</Btn>}
+      </div>
+      {err && <div style={{marginTop:9,fontSize:12.5,color:'#991b1b',lineHeight:1.5}}>{err}</div>}
+    </div>
+  );
+}
+
+function CivicOfficeForm({ form, setForm, presets, fixed, busy, onSave, onCancel }) {
+  const set = (k, v) => setForm({ ...form, [k]: v });
+  const f = {...inputStyle, fontSize:12.5, padding:'7px 10px'};
+  return (
+    <div style={{marginTop:9,display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))',gap:8,alignItems:'end'}}>
+      {!fixed && (
+        <div><label style={labelStyle}>Office</label>
+          <select value={form.office} onChange={e => set('office', e.target.value)} style={f}>{presets.map(p => <option key={p} value={p}>{p}</option>)}</select>
+          {form.office === 'Other' && <input value={form.other} onChange={e => set('other', e.target.value)} placeholder="Office title" style={{...f,marginTop:6}}/>}
+        </div>
+      )}
+      <div><label style={labelStyle}>Name</label><input value={form.name} autoFocus onChange={e => set('name', e.target.value)} placeholder="First Last" style={f}/></div>
+      <div><label style={labelStyle}>Email (optional)</label><input value={form.email} onChange={e => set('email', e.target.value)} style={f}/></div>
+      <div><label style={labelStyle}>Phone (optional)</label><input value={form.phone} onChange={e => set('phone', e.target.value)} style={f}/></div>
+      <div><label style={labelStyle}>Website (optional)</label><input value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://" style={f}/></div>
+      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <Btn onClick={onSave} disabled={busy || !form.name.trim()} style={{padding:'7px 12px',fontSize:12}}>{busy ? 'Saving…' : 'Save'}</Btn>
+        <button onClick={onCancel} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12}}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStory }) {
+  const [address, setAddress] = useState('');
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  const [legistar, setLegistar] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const wrap = {flex:1,minWidth:0,overflowY:'auto',padding:'22px 28px 60px',background:C.bg};
+  const card = {background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'14px 16px',marginBottom:14};
+  const eyebrow = {fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:8};
+  const title = {fontSize:24,fontWeight:900,color:C.text,fontFamily:"'Playfair Display', Georgia, serif",marginBottom:6};
+  const linkStyle = {color:C.accent,fontWeight:700,textDecoration:'none'};
+
+  async function run(label, fn) {
+    setBusy(label); setError('');
+    const d = await fn();
+    setBusy('');
+    if (d.error) { setError(d.error); return; }
+    onChange(d.profile || null);
+  }
+  const lookup = () => { if (address.trim() && !busy) run('lookup', () => civicPost('lookup', { address })).then(() => setAddress('')); };
+
+  if (civic === undefined) return <div style={wrap}><div style={{maxWidth:760,margin:'0 auto',color:C.textMute,fontSize:13}}>Loading…</div></div>;
+
+  // ── First-time setup ──
+  if (!civic) {
+    return (
+      <div style={wrap}>
+        <div style={{maxWidth:640,margin:'0 auto'}}>
+          <div style={title}>Civic</div>
+          <div style={{fontSize:14,color:C.textMid,lineHeight:1.65,marginBottom:18}}>Who represents you? Enter one address and Lateral finds every layer of government that speaks for you (federal, state, city and county, and your school district), with ways to contact them. No account and no keys needed.</div>
+          <div style={card}>
+            <div style={eyebrow}>Your address</div>
+            <input value={address} onChange={e => setAddress(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') lookup(); }} disabled={!!busy} autoFocus
+              placeholder="Street number and name, city, state, ZIP" style={{...inputStyle,fontSize:14,padding:'10px 13px'}}/>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
+              <Btn onClick={lookup} disabled={!!busy || !address.trim()}>{busy ? 'Asking the Census Bureau…' : 'Find my representatives'}</Btn>
+              {busy && <span style={{fontSize:12,color:C.textMute}}>A few seconds.</span>}
+            </div>
+            {error && <div style={{marginTop:12,fontSize:12.5,color:'#991b1b',lineHeight:1.5}}>{error}</div>}
+          </div>
+          <div style={{fontSize:12,color:C.textMute,lineHeight:1.7}}>
+            <strong style={{color:C.textMid}}>What happens to your address:</strong> it is sent only to the U.S. Census Bureau, which turns it into district numbers, and it is not saved. Lateral keeps just those district numbers and your city and state. You can remove them any time.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const j = civic.jurisdictions || {};
+  const officials = civic.officials || [];
+
+  // ── Overview ──
+  const place = j.place ? j.place.name : '';
+  const cong = j.congress, next = j.congressNext;
+  const mapChanges = cong && next && cong.geoid !== next.geoid;
+  const where = [
+    ['Congress', cong ? `${cong.atLarge ? 'At-large district' : 'District ' + cong.district} (${ordinalSuffix(cong.session)} Congress)` : ''],
+    ['State senate', j.stateSenate ? `${j.stateSenate.name}` : ''],
+    ['State house', j.stateHouse ? `${j.stateHouse.name}` : ''],
+    ['County', j.county ? j.county.name : ''],
+    ['City', place],
+    ['Schools', (j.schoolDistricts || []).map(s => s.name).join(', ')],
+  ].filter(([, v]) => v);
+  const loc = civic.local;
+  const cov = civic.coverage || { got: [], missing: [] };
+  return (
+    <div style={wrap}>
+      <div style={{maxWidth:760,margin:'0 auto'}}>
+        <div style={title}>Civic</div>
+        <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:16}}>Who represents you in <strong>{civic.label}</strong>. Pick a name on the left, on the map, or from the list below to open their profile on the right.</div>
+
+        <div style={card}>
+          <div style={eyebrow}>Your districts</div>
+          {where.map(([k, v]) => (
+            <div key={k} style={{display:'flex',gap:12,padding:'5px 0',fontSize:13}}><div style={{width:92,color:C.textMute,flexShrink:0}}>{k}</div><div style={{color:C.text}}>{v}</div></div>
+          ))}
+          {mapChanges && <div style={{marginTop:10,fontSize:12,color:'#92400e',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:8,padding:'7px 10px',lineHeight:1.5}}>New congressional map: your district becomes <strong>{next.atLarge ? 'at-large' : 'District ' + next.district}</strong> in the {ordinalSuffix(next.session)} Congress (from January). Your current representative is for the district above.</div>}
+        </div>
+
+        <div style={card}>
+          <div style={eyebrow}>On the map</div>
+          <CivicMap civic={civic} onSelect={onSelect} selKey={selKey}/>
+        </div>
+
+        <div style={card}>
+          <div style={eyebrow}>What was found</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {cov.got.map(g => <span key={g} style={{fontSize:11.5,fontWeight:700,color:'#166534',background:'#dcfce7',border:'1px solid #86efac',borderRadius:12,padding:'3px 10px'}}>✓ {g}</span>)}
+            {cov.missing.map(g => <span key={g} style={{fontSize:11.5,fontWeight:700,color:'#92400e',background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:12,padding:'3px 10px'}}>– {g} not found</span>)}
+          </div>
+        </div>
+
+        {place && (
+          <div style={card}>
+            <div style={eyebrow}>City council</div>
+            {loc && loc.slug && loc.confirmed && <div style={{fontSize:13,color:C.text}}>Read from <a href={loc.url} target="_blank" rel="noreferrer" style={linkStyle}>{loc.slug}.legistar.com</a>{loc.body ? ` (${loc.body}, ${loc.officialCount} members)` : ''}.</div>}
+            {loc && loc.slug && !loc.confirmed && (
+              <div>
+                <div style={{fontSize:13,color:C.text,lineHeight:1.6}}>Lateral found a council site by the name "{loc.guessedFrom}": <a href={loc.url} target="_blank" rel="noreferrer" style={linkStyle}>{loc.slug}.legistar.com</a>{loc.body ? ` (${loc.body}, ${loc.officialCount} members)` : ''}. Names repeat across states, so please check it is the right {place}.</div>
+                <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                  <Btn onClick={() => run('confirm', () => civicPost('legistar', { slug: loc.slug }))} disabled={!!busy} style={{padding:'6px 12px',fontSize:12}}>Yes, that is my city</Btn>
+                </div>
+              </div>
+            )}
+            {!(loc && loc.slug) && <div style={{fontSize:13,color:C.textMid,lineHeight:1.6}}>No council roster was found automatically. Many cities publish theirs on Legistar. If yours does, paste its address (it looks like https://yourcity.legistar.com) and Lateral will read it.</div>}
+            <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap',alignItems:'center'}}>
+              <input value={legistar} onChange={e => setLegistar(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && legistar.trim()) run('legistar', () => civicPost('legistar', { url: legistar })).then(() => setLegistar('')); }}
+                placeholder={loc && loc.slug ? 'Wrong city? Paste the right Legistar address' : 'Paste the city\'s Legistar address'} style={{...inputStyle,fontSize:12.5,padding:'6px 10px',maxWidth:330}}/>
+              <Btn variant="secondary" onClick={() => run('legistar', () => civicPost('legistar', { url: legistar })).then(() => setLegistar(''))} disabled={!!busy || !legistar.trim()} style={{padding:'6px 12px',fontSize:12}}>Use this</Btn>
+            </div>
+          </div>
+        )}
+
+        <CivicOffices civic={civic} onChange={onChange} onSelect={onSelect} card={card} eyebrow={eyebrow}/>
+
+        <CivicWatch civicAsOf={civic.asOf} onAddStory={onAddStory} onOpenStory={onOpenStory}/>
+
+        {CIVIC_LEVELS.map(([lv, ttl]) => {
+          const list = lv === 'local' ? civicSortLocal(officials.filter(o => o.level === lv)) : officials.filter(o => o.level === lv);
+          if (!list.length) return null;
+          return (
+            <div key={lv} style={card}>
+              <div style={eyebrow}>{ttl}</div>
+              {list.map(o => {
+                const on = civicKey(o) === selKey;
+                return (
+                  <button key={civicKey(o)} onClick={() => onSelect(civicKey(o))}
+                    style={{display:'flex',alignItems:'baseline',gap:10,textAlign:'left',background:on ? C.accent + '14' : 'none',border:'none',borderBottom:`1px solid ${C.borderLight}`,cursor:'pointer',padding:'7px 6px',margin:'0 -6px',borderRadius:on ? 6 : 0,width:'calc(100% + 12px)'}}>
+                    <span style={{fontSize:13,fontWeight:on ? 800 : 700,color:C.text}}>{o.name}</span>
+                    <span style={{fontSize:12,color:C.textMute,flex:1}}>{civicOfficeLine(o)}</span>
+                    {o.upForElection && <span style={{fontSize:10.5,fontWeight:700,color:'#92400e'}}>on the ballot {o.nextElection}</span>}
+                    <span style={{fontSize:11.5,color:C.textMute}}>{o.email ? '✉' : ''} {o.phone ? '☎' : ''} {(o.social || []).length ? '@' + (o.social || []).length : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+          <Btn variant="secondary" onClick={() => run('refresh', () => civicPost('refresh'))} disabled={!!busy} style={{padding:'6px 12px',fontSize:12}}>{busy === 'refresh' ? 'Checking…' : 'Re-check officials'}</Btn>
+          {!confirmRemove
+            ? <Btn variant="ghost" onClick={() => setConfirmRemove(true)} disabled={!!busy} style={{padding:'6px 12px',fontSize:12}}>Remove my Civic profile</Btn>
+            : <span style={{fontSize:12,color:C.textMid}}>Remove it? <button onClick={() => { setConfirmRemove(false); run('remove', () => civicPost('remove')); }} style={{background:'none',border:'none',cursor:'pointer',color:'#991b1b',fontWeight:700,fontSize:12}}>Yes, remove</button> <button onClick={() => setConfirmRemove(false)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12}}>Cancel</button></span>}
+          <button onClick={() => setShowSources(s => !s)} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:12,textDecoration:'underline'}}>{showSources ? 'Hide' : 'How this was built'}</button>
+        </div>
+        {error && <div style={{fontSize:12.5,color:'#991b1b',marginBottom:10}}>{error}</div>}
+        {showSources && (
+          <div style={card}>
+            <div style={eyebrow}>Where each piece came from</div>
+            {(civic.sources || []).map((s, i) => (
+              <div key={i} style={{display:'flex',gap:10,fontSize:12,padding:'3px 0',color:s.ok ? C.textMid : '#991b1b'}}>
+                <span style={{width:16}}>{s.ok ? '✓' : '✗'}</span><span style={{width:130,fontWeight:700}}>{s.stage}</span><span style={{flex:1}}>{s.provider}{s.ok ? '' : ': ' + s.error}</span><span style={{color:C.textMute}}>{s.ms} ms</span>
+              </div>
+            ))}
+            <div style={{fontSize:11.5,color:C.textMute,marginTop:8,lineHeight:1.6}}>Everything here comes from free public sources and needs no keys. Your address went only to the U.S. Census Bureau and was not saved. Profile checked {civicDate(civic.asOf)}.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function ordinalSuffix(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
 // Small line icon used by the nav and header buttons.
 function LIcon({ children, size = 14 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>;
@@ -5789,6 +6701,7 @@ const ICONS = {
   rss: <><path d="M5 5a14 14 0 0114 14"/><path d="M5 11a8 8 0 018 8"/><circle cx="6" cy="18" r="1.4" fill="currentColor"/></>,
   trend: <><path d="M4 16l5-5 4 4 7-8"/><path d="M15 7h5v5"/></>,
   coin: <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.5-2.5 1.8-2.5.8-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></>,
+  civic: <><path d="M3.5 9L12 4l8.5 5"/><path d="M5.5 10.5v6.5M10 10.5v6.5M14 10.5v6.5M18.5 10.5v6.5"/><path d="M3.5 20h17"/></>,
 };
 
 // The row of tool buttons in the top bar (used by both the desktop and the mobile layouts).
@@ -5823,6 +6736,179 @@ function SavedCountButton({ storyId, onOpen }) {
   useEffect(() => { let off = false; setN(0); if (storyId) archiveJson('list?limit=500&storyId=' + encodeURIComponent(storyId)).then(d => { if (!off) setN((d.items || []).length); }); return () => { off = true; }; }, [storyId]);
   if (!n || !onOpen) return null;
   return <button className="hd-cell" onClick={() => onOpen(storyId)} title="Saved copies of this story's articles"><LIcon>{ICONS.doc}</LIcon>Saved ({n})</button>;
+}
+
+// ── Civic: follow a bill as a prediction ─────────────────────────────────────
+// A headline from a Civic watch can be an item the server knows how to read (see proxy/civic-track.js). Older cached headlines
+// do not carry the item id yet, so it is also worked out from the link.
+const CIVIC_PATH_TYPE = { 'house-bill': 'HR', 'senate-bill': 'S', 'house-resolution': 'HRES', 'senate-resolution': 'SRES', 'house-joint-resolution': 'HJRES', 'senate-joint-resolution': 'SJRES', 'house-concurrent-resolution': 'HCONRES', 'senate-concurrent-resolution': 'SCONRES' };
+function civicItemOf(article) {
+  const c = article && article.civic;
+  if (!c || (c.kind !== 'bill' && c.kind !== 'legislation')) return '';
+  if (c.item) return c.item;
+  const u = String(article.realUrl || article.url || '');
+  let m = /congress\.gov\/bill\/(\d+)(?:st|nd|rd|th)-congress\/([a-z-]+)\/(\d+)/.exec(u);
+  if (m && CIVIC_PATH_TYPE[m[2]]) return `bill:${m[1]}-${CIVIC_PATH_TYPE[m[2]]}-${m[3]}`;
+  m = /legistar\.com\/LegislationDetail\.aspx\?ID=(\d+)/i.exec(u);
+  return m ? `matter:${m[1]}` : '';
+}
+
+const CIVIC_KIND_COLOR = { enacted: '#059669', chamber: C.accent, presented: '#0e7490', committee: C.textMid, veto: '#dc2626', failed: '#dc2626' };
+
+function TrackBillModal({ item, onClose, onCreated }) {
+  const [pv, setPv] = useState(null);
+  const [err, setErr] = useState('');
+  const [target, setTarget] = useState('');
+  const [conf, setConf] = useState(50);
+  const [by, setBy] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    civicJson('track/preview?item=' + encodeURIComponent(item)).then(d => {
+      if (!live) return;
+      if (d.error) { setErr(d.error + (d.needsKey ? ' Add the key on the Civic page, under Watching.' : '')); return; }
+      setPv(d); setTarget(d.defaultTarget); setBy(d.resolveBy);
+      const tg = d.targets.find(t => t.id === d.defaultTarget); setConf(tg ? tg.confidence : 50);
+    });
+    return () => { live = false; };
+  }, [item]);
+  const tg = pv && pv.targets.find(t => t.id === target);
+  function pick(id) { setTarget(id); const t = pv.targets.find(x => x.id === id); if (t) setConf(t.confidence); }
+  async function create() {
+    setBusy(true); setErr('');
+    const d = await civicPost('track/start', { item, target, confidence: Number(conf), resolveBy: by });
+    setBusy(false);
+    if (d.error) { setErr(d.error + (d.needsKey ? ' Add the key on the Civic page, under Watching.' : '')); return; }
+    onCreated(d);
+  }
+  const blocked = !tg || !!tg.already;
+  return (
+    <Modal title="Track this bill as a prediction" onClose={onClose} maxWidth={540}>
+      {!pv && !err && <div style={{fontSize:13,color:C.textMute,padding:'18px 0'}}>Reading the official record…</div>}
+      {err && <div style={{fontSize:12.5,color:'#b91c1c',background:'#fef2f2',borderRadius:8,padding:'9px 12px',marginBottom:12,lineHeight:1.5}}>{err}</div>}
+      {pv && (
+        <>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:14,fontWeight:800,color:C.text,marginBottom:3}}>{pv.label}</div>
+            <div style={{fontSize:13,color:C.textMid,lineHeight:1.5}}>{pv.title}</div>
+            {pv.url && <a href={pv.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none'}}>Official page ↗</a>}
+          </div>
+          <label style={labelStyle}>What are you predicting?</label>
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
+            {pv.targets.map(t => (
+              <label key={t.id} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 11px',borderRadius:8,border:`1.5px solid ${target === t.id ? C.accent : C.border}`,background:target === t.id ? C.accent + '0f' : 'transparent',cursor:'pointer',opacity:t.already ? 0.6 : 1}}>
+                <input type="radio" name="trk-target" checked={target === t.id} onChange={() => pick(t.id)} style={{marginTop:3}}/>
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:'block',fontSize:13,fontWeight:700,color:C.text}}>{t.label}</span>
+                  <span style={{display:'block',fontSize:11.5,color:C.textMute,lineHeight:1.45}}>{t.blurb}</span>
+                  {t.already && <span style={{display:'block',fontSize:11.5,color:'#b45309',marginTop:3,lineHeight:1.45}}>Already {t.already.outcome === 'yes' ? 'happened' : 'decided against'} on {civicDate(t.already.date)}: {t.already.text}. There is nothing left to predict here.</span>}
+                  {t.tracking && !t.already && <span style={{display:'block',fontSize:11.5,color:'#0e7490',marginTop:3}}>You are already tracking this.</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+          {tg && !tg.already && (
+            <>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:6}}>
+                <div><label style={labelStyle}>Your confidence (%)</label><input type="number" min={1} max={99} value={conf} onChange={e => setConf(Math.max(1, Math.min(99, Number(e.target.value) || 1)))} style={inputStyle}/></div>
+                <div><label style={labelStyle}>Resolves by</label><input type="date" value={by} onChange={e => setBy(e.target.value)} style={inputStyle}/></div>
+              </div>
+              <div style={{fontSize:11.5,color:C.textMute,lineHeight:1.5,marginBottom:14}}>Starting point, from how bills like this usually go: {tg.why} Change it to your own number.</div>
+            </>
+          )}
+          {pv.recent.length > 0 && (
+            <div style={{marginBottom:14}}>
+              <label style={labelStyle}>Latest official actions</label>
+              {pv.recent.slice(0, 3).map((a, i) => <div key={i} style={{fontSize:12,color:C.textMid,lineHeight:1.5}}><span style={{color:C.textMute}}>{civicDate(a.date)}</span> · {a.text}</div>)}
+            </div>
+          )}
+          <div style={{fontSize:11.5,color:C.textMute,lineHeight:1.5,marginBottom:14}}>
+            Lateral will keep the bill’s official actions as a timeline on the prediction, tell you when it moves, and settle the prediction from the official record when the question is decided. You can always settle or reopen it yourself.
+          </div>
+          {tg && tg.tracking
+            ? <Btn onClick={() => onCreated({ existing: { predictionId: tg.tracking } })} style={{width:'100%'}}>Open the prediction I already have</Btn>
+            : <Btn onClick={create} disabled={busy || blocked} style={{width:'100%'}}>{busy ? 'Creating…' : 'Create prediction'}</Btn>}
+        </>
+      )}
+    </Modal>
+  );
+}
+
+// The official record on a prediction page: a timeline of the bill's own actions, kept apart from the evidence balance.
+function CivicRecord({ pid, HL, onChanged }) {
+  const [tr, setTr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [all, setAll] = useState(false);
+  const [note, setNote] = useState('');
+  const load = () => civicJson('track/get?predictionId=' + encodeURIComponent(pid)).then(d => setTr(d.track || null));
+  useEffect(() => { setTr(null); setAll(false); setNote(''); load(); }, [pid]);
+  useEffect(() => {
+    const h = e => { if (e.detail === pid) load(); };
+    window.addEventListener('lateral-prediction-updated', h);
+    return () => window.removeEventListener('lateral-prediction-updated', h);
+  }, [pid]);
+  if (!tr) return null;
+  async function checkNow() {
+    setBusy(true); setNote('');
+    const d = await civicPost('track/refresh', { predictionId: pid });
+    setBusy(false);
+    if (d.track) setTr(d.track);
+    if (d.error) setNote(d.error);
+    else if (d.found) { setNote(`${d.found} new development${d.found === 1 ? '' : 's'}.`); onChanged && onChanged(); }
+    else setNote('Checked. Nothing new on the record.');
+  }
+  async function stop() {
+    setBusy(true);
+    const d = await civicPost('track/stop', { predictionId: pid });
+    setBusy(false);
+    if (d.track) setTr(d.track);
+  }
+  const rows = all ? tr.actions : tr.actions.slice(0, 8);
+  const checked = tr.checkedAt ? new Date(tr.checkedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const settled = tr.outcome;
+  return (
+    <div style={{marginBottom:20}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+        <div style={{...HL,marginBottom:0}}>Official record</div>
+        {tr.url && <a href={tr.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11.5,color:C.accent,fontWeight:700,textDecoration:'none'}}>{tr.label} on the official site ↗</a>}
+      </div>
+      <div style={{padding:'12px 14px',borderRadius:8,background:C.surface,border:`1px solid ${C.borderLight}`}}>
+        <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.55,marginBottom:10}}>
+          {settled
+            ? <>Settled <b style={{color:settled.outcome === 'yes' ? '#059669' : '#dc2626'}}>{settled.outcome === 'yes' ? 'YES' : 'NO'}</b> from the official record: {settled.text}</>
+            : tr.status === 'open'
+              ? <>Following {tr.label} for “{tr.targetLabel.toLowerCase()}”, by {civicDate(tr.resolveBy)}.{checked ? ` Last checked ${checked}.` : ''}</>
+              : <>No longer following this bill’s record.</>}
+          {tr.error && tr.status === 'open' && <span style={{color:'#b45309'}}> The last check failed ({tr.error}); the record below is from the previous one.</span>}
+        </div>
+        {rows.length === 0 && <div style={{fontSize:12,color:C.textMute}}>No official actions recorded yet.</div>}
+        <div style={{position:'relative',paddingLeft:16}}>
+          {rows.length > 1 && <div style={{position:'absolute',left:4,top:6,bottom:6,width:2,background:C.borderLight,borderRadius:1}}/>}
+          {rows.map((a, i) => (
+            <div key={i} style={{position:'relative',padding:'4px 0 7px'}}>
+              <span style={{position:'absolute',left:-16,top:9,width:10,height:10,borderRadius:'50%',background:a.milestone ? (CIVIC_KIND_COLOR[a.kind] || C.accent) : C.surface,border:`2px solid ${a.milestone ? (CIVIC_KIND_COLOR[a.kind] || C.accent) : C.border}`}}/>
+              <div style={{fontSize:11,color:C.textMute}}>{civicDate(a.date)}{a.chamber ? ` · ${a.chamber}` : ''}</div>
+              <div style={{fontSize:12.5,color:C.text,lineHeight:1.5,fontWeight:a.milestone ? 600 : 400}}>
+                {a.text}
+                {a.vote && a.vote.tally && (a.vote.url
+                  ? <a href={a.vote.url} target="_blank" rel="noopener noreferrer" title="The roll-call vote" style={{marginLeft:8,fontSize:11,fontWeight:800,color:C.accent,background:C.accent + '14',borderRadius:6,padding:'1px 7px',textDecoration:'none',whiteSpace:'nowrap'}}>{a.vote.tally.replace('-', '–')} ↗</a>
+                  : <span style={{marginLeft:8,fontSize:11,fontWeight:800,color:C.accent,background:C.accent + '14',borderRadius:6,padding:'1px 7px',whiteSpace:'nowrap'}}>{a.vote.tally.replace('-', '–')}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+        {tr.actions.length > 8 && <button onClick={() => setAll(!all)} style={{border:'none',background:'none',color:C.accent,fontSize:12,fontWeight:700,cursor:'pointer',padding:'2px 0 6px'}}>{all ? 'Show fewer' : `Show all ${tr.actionCount}`}</button>}
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:4}}>
+          {tr.status === 'open' && <Btn variant="secondary" onClick={checkNow} disabled={busy} style={{padding:'5px 11px',fontSize:12}}>{busy ? 'Checking…' : 'Check now'}</Btn>}
+          {tr.status === 'open' && <Btn variant="ghost" onClick={stop} disabled={busy} style={{padding:'5px 11px',fontSize:12}}>Stop following</Btn>}
+          {note && <span style={{fontSize:11.5,color:C.textMute}}>{note}</span>}
+        </div>
+        <div style={{marginTop:9,fontSize:11,color:C.textMute,lineHeight:1.5,fontStyle:'italic'}}>
+          These are the bill’s own actions from the official source. They are a record of what happened, not evidence: they never move the evidence balance above.
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Record how a prediction turned out, and show the running track record: did the evidence balance lean the way
@@ -6107,7 +7193,7 @@ function PredictionCenterView({ story, onOpenLibrary }) {
           </div>
           <div style={{display:'flex',gap:14,marginTop:10,fontSize:12,color:C.textMute}}>
             <span>Entered: {new Date(story.createdAt).toLocaleDateString()}</span>
-            {prediction?.resolutionDate && <span>Resolves: {new Date(prediction.resolutionDate).toLocaleDateString()}</span>}
+            {prediction?.resolutionDate && <span>Resolves: {civicDate(prediction.resolutionDate)}</span>}
             <span>Signals: {prediction?.signals?.length || 0}</span>
           </div>
         </div>
@@ -6153,6 +7239,7 @@ function PredictionCenterView({ story, onOpenLibrary }) {
         )}
 
         <OutcomePanel prediction={prediction} pid={pid} HL={HL} onChanged={loadAll} />
+        <CivicRecord pid={pid} HL={HL} onChanged={loadAll} />
 
         {/* Signals */}
         <div style={{marginBottom:20}}>
@@ -7004,7 +8091,7 @@ function PredictionDetail({ predictionId, compact }) {
         <div style={{fontSize:12,color:C.text,lineHeight:1.5}}>{prediction.statement}</div>
         <div style={{display:'flex',flexDirection:'column',gap:4,fontSize:11,color:C.textMute}}>
           <span>Status: <strong style={{color:C.text}}>{prediction.status}</strong></span>
-          {prediction.resolutionDate && <span>Resolves: {new Date(prediction.resolutionDate).toLocaleDateString()}</span>}
+          {prediction.resolutionDate && <span>Resolves: {civicDate(prediction.resolutionDate)}</span>}
           <span>Signals: {prediction.signals?.length || 0}</span>
         </div>
         {supports.length > 0 && (
@@ -7036,7 +8123,7 @@ function PredictionDetail({ predictionId, compact }) {
         </div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',fontSize:11,color:C.textMute}}>
           <span>Status: <strong style={{color:C.text}}>{prediction.status}</strong></span>
-          {prediction.resolutionDate && <span>Resolves: {new Date(prediction.resolutionDate).toLocaleDateString()}</span>}
+          {prediction.resolutionDate && <span>Resolves: {civicDate(prediction.resolutionDate)}</span>}
           <span>Signals: {prediction.signals?.length || 0}</span>
         </div>
       </div>
@@ -7145,7 +8232,7 @@ function PredictionDetail({ predictionId, compact }) {
   );
 }
 
-function RightPanel({ story, ep, onDeleteEp, onUpdateEp, settings, stories, onAddStory, onAddEpisode, onResolveStory, onDeleteStory, onPopOut, onWidthChange, isMobile = false }) {
+function RightPanel({ story, ep, onDeleteEp, onUpdateEp, settings, stories, onAddStory, onAddEpisode, onResolveStory, onDeleteStory, onPopOut, onWidthChange, isMobile = false, civicNode = null }) {
   const [panelWidth,   setPanelWidth]   = useState(308);
   const [handleHover,  setHandleHover]  = useState(false);
 
@@ -7175,7 +8262,9 @@ function RightPanel({ story, ep, onDeleteEp, onUpdateEp, settings, stories, onAd
   }
 
   let content;
-  if (ep) {
+  if (civicNode) {
+    content = civicNode;
+  } else if (ep) {
     content = <EpisodeDetail key={ep.id} story={story} ep={ep} onUpdateEp={onUpdateEp} onDeleteEp={onDeleteEp} settings={settings} onPopOut={onPopOut}/>;
   } else if (story?.predictionId) {
     content = (
@@ -7214,7 +8303,7 @@ function RightPanel({ story, ep, onDeleteEp, onUpdateEp, settings, stories, onAd
     content = <AddPanel stories={stories} selStory={null} settings={settings} onAddStory={onAddStory} onAddEpisode={onAddEpisode}/>;
   }
 
-  const showResolveBtn = story && !ep;
+  const showResolveBtn = !civicNode && story && !ep;
 
   return (
     <div style={{display:'flex',width:isMobile ? '100%' : panelWidth,minWidth:isMobile ? 0 : 220,flexShrink:0,
@@ -7232,7 +8321,7 @@ function RightPanel({ story, ep, onDeleteEp, onUpdateEp, settings, stories, onAd
       )}
       {/* Content + footer */}
       <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden'}}>
-        <div style={{flex:1,overflowY:'auto',padding:'20px 18px'}}>
+        <div style={{flex:1,overflowY:'auto',padding:civicNode ? 0 : '20px 18px'}}>
           {content}
         </div>
         {showResolveBtn && (
@@ -8322,6 +9411,10 @@ const ALERT_KIND = {
   'story-activity': { icon: 'doc', color: '#2563eb', label: 'Story' },
   system: { icon: 'warn', color: '#dc2626', label: 'Setup' },
   tavily: { icon: 'coin', color: '#d97706', label: 'Credits' },
+  'civic-vote': { icon: 'civic', color: '#7c3aed', label: 'Bill or ordinance' },
+  'civic-deadline': { icon: 'clock', color: '#d97706', label: 'Comment deadline' },
+  'civic-meeting': { icon: 'civic', color: '#0ea5e9', label: 'Meeting' },
+  'civic-activity': { icon: 'civic', color: '#7c3aed', label: 'Civic' },
 };
 const timeAgo = iso => {
   const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -8521,6 +9614,7 @@ function AlertsPanel() {
         {check('A prediction’s resolution date is close', cfg.instant.resolutionDue, v => change({ instant: { resolutionDue: v } }), 'A week out, a day out, the day itself, and when it is overdue.')}
         {check('Something needs attention', cfg.instant.system, v => change({ instant: { system: v } }), 'The local AI, search, or your Tavily key stops working (and when it recovers).')}
         {check('Tavily credits are running low', cfg.instant.tavilyUsage, v => change({ instant: { tavilyUsage: v } }))}
+        {check('A watched bill moves, a meeting is tomorrow, or a comment period is closing', cfg.instant.civic !== false, v => change({ instant: { civic: v } }), 'For the watches you switch on in Civic. New items from them always go in the daily digest.')}
         <div style={{height:1,background:C.borderLight,margin:'10px 0'}}/>
         {check('Send a daily digest', cfg.digest.enabled, v => change({ digest: { enabled: v, tzOffsetMin: new Date().getTimezoneOffset() } }, true), 'One message with everything since the last one, including stories with new coverage. Nothing is sent on quiet days.')}
         {cfg.digest.enabled && (
@@ -10830,6 +11924,13 @@ function ArticleCard({ article, compact = false, feature = false, hideMedia = fa
           {sourceLabel && article.date && <span>·</span>}
           {article.date && <span style={{whiteSpace:'nowrap'}}>{fmtS(article.date)}</span>}
         </div>
+        {civicItemOf(article) && (
+          <button
+            onClick={e => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('lateral-track-bill', { detail: civicItemOf(article) })); }}
+            title="Follow this bill as a prediction, settled from the official record"
+            style={{ marginTop:4, alignSelf:'flex-start', padding:'2px 8px', borderRadius:5, background:'none', color:C.accent, border:`1px solid ${C.accent}`, fontSize:10, fontWeight:700, cursor:'pointer', letterSpacing:'0.02em' }}
+          >Track as prediction</button>
+        )}
         {onTrack && (
           <button
             onClick={e => { e.stopPropagation(); onTrack(article); }}
@@ -11108,7 +12209,7 @@ function PredictionsPanel() {
             <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:12,color:C.textMute}}>
               <span>Status: <strong style={{color:C.text}}>{activePred.status}</strong></span>
               <span>Created: {new Date(activePred.createdAt).toLocaleDateString()}</span>
-              {activePred.resolutionDate && <span>Resolves: {new Date(activePred.resolutionDate).toLocaleDateString()}</span>}
+              {activePred.resolutionDate && <span>Resolves: {civicDate(activePred.resolutionDate)}</span>}
               <span>Signals: {activePred.signals?.length || 0}</span>
             </div>
           </div>
@@ -12433,7 +13534,7 @@ function ChatDrawer({ story, stories, leftPanelOpen, rightPanelWidth = 308, onAd
 
   function handleClear() { setMessages([]); setOpen(false); }
 
-  const leftInset = isMobile ? 0 : (leftPanelOpen ? 272 : 56);
+  const leftInset = isMobile ? 0 : (leftPanelOpen ? 304 : 56);
   const rightInset = isMobile ? 0 : rightPanelWidth;
 
   return (
@@ -12644,45 +13745,45 @@ function useIsMobile(breakpoint = MOBILE_BREAKPOINT) {
   return isMobile;
 }
 
-function MobileDrawer({ side='left', open, onClose, width, children }) {
+// A phone-sized side panel. It closes with: the Close bar (a big touch target), a tap on the dimmed page beside it, a swipe toward
+// its own edge, or Escape. It never fills the screen: a strip of the page always stays visible to tap.
+function MobileDrawer({ side='left', open, onClose, width, label, children }) {
+  const touch = useRef(null);
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prevOverflow; };
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prevOverflow; window.removeEventListener('keydown', onKey); };
   }, [open]);
   if (!open) return null;
-  const panelStyle = side === 'left'
-    ? { left: 0, borderRight: `1px solid ${C.border}`, transform: 'translateX(0)' }
-    : { right: 0, borderLeft: `1px solid ${C.border}`, transform: 'translateX(0)' };
+  const toward = side === 'left' ? -1 : 1;   // the swipe direction that closes this drawer
+  const onTouchStart = e => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; };
+  const onTouchEnd = e => {
+    const s = touch.current; touch.current = null;
+    if (!s || !e.changedTouches[0]) return;
+    const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
+    if (dx * toward > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) onClose();   // a clear, mostly horizontal swipe
+  };
+  const edge = side === 'left' ? { left: 0, borderRight: `1px solid ${C.border}` } : { right: 0, borderLeft: `1px solid ${C.border}` };
   return (
     <>
-      <div
-        onClick={onClose}
-        style={{
-          position:'fixed',
-          inset:0,
-          background:'rgba(10, 12, 16, 0.42)',
-          backdropFilter:'blur(2px)',
-          zIndex:1400
-        }}
-      />
-      <div
-        style={{
-          position:'fixed',
-          top:52,
-          bottom:0,
-          width:width,
-          maxWidth:'92vw',
-          background:C.surface,
-          zIndex:1401,
-          boxShadow: side === 'left' ? '10px 0 30px rgba(0,0,0,0.18)' : '-10px 0 30px rgba(0,0,0,0.18)',
-          overflow:'hidden',
-          display:'flex',
-          ...panelStyle
-        }}
-      >
-        {children}
+      <div onClick={onClose} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} aria-hidden="true"
+        style={{position:'fixed',inset:0,background:'rgba(10, 12, 16, 0.42)',backdropFilter:'blur(2px)',zIndex:1400}}/>
+      <div role="dialog" aria-modal="true" aria-label={label || (side === 'left' ? 'Menu' : 'Details')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{position:'fixed',top:52,bottom:0,width:width,maxWidth:'calc(100vw - 56px)',background:C.surface,zIndex:1401,
+                boxShadow: side === 'left' ? '10px 0 30px rgba(0,0,0,0.18)' : '-10px 0 30px rgba(0,0,0,0.18)',
+                overflow:'hidden',display:'flex',flexDirection:'column',...edge}}>
+        <div style={{flexShrink:0,display:'flex',justifyContent:side === 'left' ? 'flex-end' : 'flex-start',alignItems:'center',borderBottom:`1px solid ${C.borderLight}`,background:C.surface}}>
+          <button onClick={onClose} aria-label="Close panel"
+            style={{display:'inline-flex',alignItems:'center',gap:8,minHeight:46,padding:'0 18px',border:'none',background:'none',color:C.textMid,fontSize:13,fontWeight:700,cursor:'pointer',WebkitTapHighlightColor:'transparent'}}>
+            {side === 'right' && <LIcon size={18}><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></LIcon>}
+            Close
+            {side === 'left' && <LIcon size={18}><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></LIcon>}
+          </button>
+        </div>
+        <div style={{flex:1,minHeight:0,display:'flex'}}>{children}</div>
       </div>
     </>
   );
@@ -12701,10 +13802,12 @@ function App() {
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false);
   const [aiLoading,setAiLoading]=useState(false);
   const [homeView,setHomeView]=useState(() => !getStoryIdFromUrl());
-  const [activeView, setActiveView] = useState('stories'); // 'stories' | 'predictions' | 'library'
+  const [activeView, setActiveView] = useState('stories'); // 'stories' | 'predictions' | 'library' | 'civic'
   const [libKey, setLibKey] = useState(null);      // saved article open in the Library
   const [libStory, setLibStory] = useState('');     // Library list filter: '' all, '_none' unlinked, or a story id
   const [libTick, setLibTick] = useState(0);        // bumped when saved articles or their story links change
+  const [civic, setCivic] = useState(undefined);    // Civic profile: undefined = not loaded yet, null = none set up
+  const [civicSel, setCivicSel] = useState(null);   // official open in the Civic panel
   const skipNextUrlPushRef = useRef(false);
   const [prefillArticle,setPrefillArticle]=useState(null);
   const [cacheVer,setCacheVer]=useState(0); // bumped after server cache hydration → triggers re-render
@@ -12854,9 +13957,26 @@ function App() {
     document.addEventListener('visibilitychange', onVis);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
   }, []);
+  // A "Track as prediction" button on a bill headline asks the app to open the tracking dialog.
+  const [trackBill, setTrackBill] = useState('');
+  useEffect(() => {
+    const h = e => setTrackBill(String(e.detail || ''));
+    window.addEventListener('lateral-track-bill', h);
+    return () => window.removeEventListener('lateral-track-bill', h);
+  }, []);
   const openStoryById = (id) => { const st = storiesView.find(x => x.id === id); setActiveView(st && st.predictionId ? 'predictions' : 'stories'); setSelStory(id); setSelEp(null); setHomeView(false); setModal(null); };
 
   // Open the Library (optionally filtered to one tracked story's saved articles).
+  const openCivic = () => { setActiveView('civic'); setLeftPanelOpen(true); setCivicSel(null); setModal(null); };
+  const civicSelOfficial = civic && civicSel ? (civic.officials || []).find(o => civicKey(o) === civicSel) : null;
+  const civicPanel = activeView === 'civic'
+    ? (civicSelOfficial ? <CivicProfile key={civicSel} o={civicSelOfficial} civic={civic} onClose={() => { setCivicSel(null); if (isMobile) setMobileRightPanelOpen(false); }} onUpdate={setCivic}/> : <CivicProfileEmpty hasProfile={!!civic}/>)
+    : null;
+  // On a phone the two drawers never stack: opening one closes the other, and choosing someone in the Civic list shows their profile.
+  useEffect(() => { if (isMobile && activeView === 'civic' && civicSel) { setLeftPanelOpen(false); setMobileRightPanelOpen(true); } }, [civicSel]);
+  useEffect(() => { if (isMobile && leftPanelOpen) setMobileRightPanelOpen(false); }, [leftPanelOpen]);
+  useEffect(() => { if (isMobile && mobileRightPanelOpen) setLeftPanelOpen(false); }, [mobileRightPanelOpen]);
+  useEffect(() => { if (activeView === 'civic' && civic === undefined) civicJson('profile').then(d => setCivic(d.error ? null : (d.profile || null))); }, [activeView]);
   const openLibrary = (storyId) => { setActiveView('library'); setLeftPanelOpen(true); setLibKey(null); if (typeof storyId === 'string') setLibStory(storyId); setModal(null); };
 
   // Keyboard shortcuts. Ignored while typing in a field or when a modifier key is held.
@@ -12877,6 +13997,7 @@ function App() {
         case 'n': e.preventDefault(); setModal('addStory'); break;
         case 'p': e.preventDefault(); setModal('addPrediction'); break;
         case 'l': e.preventDefault(); openLibrary(); break;
+        case 'c': e.preventDefault(); openCivic(); break;
         case 'a': e.preventDefault(); setModal('activity'); break;
         case ',': e.preventDefault(); openSettings(); break;
         case 't': toggleTheme(); break;
@@ -13517,11 +14638,11 @@ function App() {
             onClose={()=>setLeftPanelOpen(false)}
             activeView={activeView}
             onViewChange={setActiveView}
-            libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>}
+            libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>} civicNode={<CivicList civic={civic} selKey={civicSel} onSelect={setCivicSel}/>}
           />
         )}
         {isMobile && (
-          <MobileDrawer side={'left'} open={leftPanelOpen} onClose={()=>setLeftPanelOpen(false)} width={272}>
+          <MobileDrawer side={'left'} open={leftPanelOpen} onClose={()=>setLeftPanelOpen(false)} width={304} label="Stories, predictions, library and civic">
             <LeftPanel
               stories={storiesView}
               selectedId={selStory}
@@ -13531,16 +14652,19 @@ function App() {
               onDeleteStory={deleteStory}
               onReorderStories={reorderStories}
               isOpen={true}
+              fluid
               onOpen={()=>setLeftPanelOpen(true)}
               onClose={()=>setLeftPanelOpen(false)}
               activeView={activeView}
               onViewChange={setActiveView}
-              libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>}
+              libraryNode={<LibraryList stories={storiesView} selectedKey={libKey} onOpen={setLibKey} filterStory={libStory} onFilterStory={setLibStory} tick={libTick}/>} civicNode={<CivicList civic={civic} selKey={civicSel} onSelect={setCivicSel}/>}
             />
           </MobileDrawer>
         )}
         <div style={{flex:1,minWidth:0,display:'flex',overflow:'hidden'}}>
-          {activeView==='library'
+          {activeView==='civic'
+            ? <CivicCenter civic={civic} selKey={civicSel} onSelect={setCivicSel} onChange={p => { setCivic(p); setCivicSel(null); }} onUpdate={setCivic} onAddStory={addStory} onOpenStory={openStoryById}/>
+            : activeView==='library'
             ? <LibraryCenter keyId={libKey} stories={storiesView} onSelectKey={setLibKey} onFilterStory={setLibStory} onOpenStory={id=>{const st=storiesView.find(x=>x.id===id); setActiveView(st&&st.predictionId?'predictions':'stories'); setSelStory(id); setSelEp(null); setHomeView(false);}} onChanged={()=>setLibTick(t=>t+1)} tick={libTick}/>
             : homeView
             ? <HomePanel stories={storiesView} settings={settings} serverReady={serverReady} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}} onAddEpisode={addEpisodeFromCard} onSelectStory={id=>{setSelStory(id);setHomeView(false);}} refreshing={refreshingHL} refreshProg={refreshHLProg} refreshDone={refreshHLDone} refreshLog={refreshLog}/>
@@ -13548,17 +14672,23 @@ function App() {
           }
         </div>
         {!isMobile && (
-          <RightPanel story={story} ep={ep} onDeleteEp={deleteEpisode} onUpdateEp={updateEpisode} settings={settings} stories={storiesView} onAddStory={addStory} onAddEpisode={addEpisode} onResolveStory={resolveStory} onDeleteStory={deleteStory} onPopOut={setFloatingPlayer} onWidthChange={setRightPanelWidth}/>
+          <RightPanel story={story} ep={ep} onDeleteEp={deleteEpisode} onUpdateEp={updateEpisode} settings={settings} stories={storiesView} onAddStory={addStory} onAddEpisode={addEpisode} onResolveStory={resolveStory} onDeleteStory={deleteStory} onPopOut={setFloatingPlayer} onWidthChange={setRightPanelWidth} civicNode={civicPanel}/>
         )}
         {isMobile && (
-          <MobileDrawer side={'right'} open={mobileRightPanelOpen} onClose={()=>setMobileRightPanelOpen(false)} width={Math.min(Math.max(rightPanelWidth, 260), 360)}>
-            <RightPanel story={story} ep={ep} onDeleteEp={deleteEpisode} onUpdateEp={updateEpisode} settings={settings} stories={storiesView} onAddStory={addStory} onAddEpisode={addEpisode} onResolveStory={resolveStory} onDeleteStory={deleteStory} onPopOut={setFloatingPlayer} onWidthChange={setRightPanelWidth} isMobile={true}/>
+          <MobileDrawer side={'right'} open={mobileRightPanelOpen} onClose={()=>setMobileRightPanelOpen(false)} width={Math.min(Math.max(rightPanelWidth, 260), 360)} label="Details">
+            <RightPanel story={story} ep={ep} onDeleteEp={deleteEpisode} onUpdateEp={updateEpisode} settings={settings} stories={storiesView} onAddStory={addStory} onAddEpisode={addEpisode} onResolveStory={resolveStory} onDeleteStory={deleteStory} onPopOut={setFloatingPlayer} onWidthChange={setRightPanelWidth} isMobile={true} civicNode={civicPanel}/>
           </MobileDrawer>
         )}
       </div>
       <ChatDrawer story={story} stories={storiesView} leftPanelOpen={isMobile ? false : leftPanelOpen} rightPanelWidth={isMobile ? 0 : rightPanelWidth} onAddEpisode={addEpisode} isMobile={isMobile}/>
       {modal==='addStory'   && <AddStoryModal onClose={()=>{setModal(null);setPrefillArticle(null);}} onAdd={addStory} settings={settings} prefill={prefillArticle}/>}
       {modal==='addPrediction' && <AddPredictionModal onClose={()=>setModal(null)} onAdd={addStory}/>}
+      {trackBill && <TrackBillModal item={trackBill} onClose={()=>setTrackBill('')} onCreated={d => {
+        setTrackBill('');
+        if (d.existing) { openStoryById('pred-' + d.existing.predictionId.slice(0, 8)); return; }
+        addStory({ ...d.story, status: 'active', actors: [], createdAt: now(), updatedAt: now(), episodes: [] });
+        setActiveView('predictions');
+      }}/>}
       {modal==='addEpisode' && story && <AddEpisodeModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='backfill'   && story && <BackfillModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
       {modal==='discover'   && story && <DiscoverModal story={story} onClose={()=>setModal(null)} onAdd={addEpisode} settings={settings}/>}
@@ -13566,7 +14696,7 @@ function App() {
       {modal==='activity'   && <ActivityModal onClose={()=>{setModal(null);refreshAlerts();}} onOpenStory={openStoryById} onOpenSettings={()=>openSettings('alerts')} onChanged={refreshAlerts}/>}
       {modal==='shortcuts'  && (
         <Modal title="Keyboard shortcuts" onClose={()=>setModal(null)} maxWidth={420}>
-          {[['/','Search the news'],['h','Home'],['n','New story'],['p','New prediction'],['l','Library (saved articles)'],['a','Activity and alerts'],[',','Settings'],['t','Switch theme'],['?','This list'],['Esc','Close a window']].map(([k,d]) => (
+          {[['/','Search the news'],['h','Home'],['n','New story'],['p','New prediction'],['l','Library (saved articles)'],['c','Civic (who represents you)'],['a','Activity and alerts'],[',','Settings'],['t','Switch theme'],['?','This list'],['Esc','Close a window']].map(([k,d]) => (
             <div key={k} style={{display:'flex',alignItems:'center',gap:14,padding:'7px 0',borderBottom:`1px solid ${C.borderLight}`}}>
               <kbd style={{minWidth:34,textAlign:'center',padding:'2px 8px',borderRadius:5,border:`1px solid ${C.border}`,background:C.surface,color:C.text,fontSize:12,fontWeight:700,fontFamily:'inherit'}}>{k}</kbd>
               <span style={{fontSize:13,color:C.text}}>{d}</span>

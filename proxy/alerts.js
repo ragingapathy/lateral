@@ -39,7 +39,7 @@ function defaults() {
     config: {
       channels: [],
       digest: { enabled: true, time: '08:00', tzOffsetMin: 0 },
-      instant: { predictionMoves: true, resolutionDue: true, system: true, tavilyUsage: true },
+      instant: { predictionMoves: true, resolutionDue: true, system: true, tavilyUsage: true, civic: true },
       sensitivity: { scoreDelta: 20 },
       watch: { hours: 0 },
       appUrl: '',
@@ -147,7 +147,8 @@ async function deliver(msg) {
 function isInstant(e) {
   const i = db.config.instant;
   return (e.kind === 'prediction-move' && i.predictionMoves) || (e.kind === 'prediction-due' && i.resolutionDue)
-    || (e.kind === 'system' && i.system) || (e.kind === 'tavily' && i.tavilyUsage);
+    || (e.kind === 'system' && i.system) || (e.kind === 'tavily' && i.tavilyUsage)
+    || (['civic-vote', 'civic-deadline', 'civic-meeting'].includes(e.kind) && i.civic);   // civic-activity goes to the digest only
 }
 
 function addEvent(ev) {
@@ -240,6 +241,34 @@ function onRefreshRun(run) {
   }
 }
 
+// Civic watches (see civic-watch.js): a bill or ordinance that moved, a meeting tomorrow, a public-comment period closing, and
+// the ordinary new items (digest only). Keyed events fire once.
+async function checkCivic() {
+  let evs = [];
+  try { evs = await require('./civic-watch').collect(); } catch { /* the bill tracker below still runs */ }
+  // Official-record events for bills tracked as predictions (civic-track.js).
+  try { evs = evs.concat(await require('./civic-track').collect()); } catch { /* optional */ }
+  if (!evs.length) return;
+  for (const ev of evs) {
+    const { key, activity, count, ...rest } = ev;
+    if (key) { if (db.state.fired[key]) continue; db.state.fired[key] = Date.now(); }
+    if (activity) {
+      // New items that keep arriving for one watch are one growing entry, not a pile of near-identical ones.
+      const recent = db.events.find(e => e.kind === 'civic-activity' && e.storyId === rest.storyId && Date.now() - Date.parse(e.at) < 12 * 3600000);
+      if (recent) {
+        const total = (recent.data && recent.data.count || 0) + count;
+        recent.title = rest.title.replace(/: \d+ new or updated items?$/, `: ${total} new or updated item${total === 1 ? '' : 's'}`);
+        recent.body = [...rest.body.split('\n'), ...String(recent.body).split('\n')].filter((x, i, a) => a.indexOf(x) === i).slice(0, 4).join('\n');
+        recent.data = { count: total }; recent.at = nowIso(); recent.read = false; recent.delivered = {};
+        continue;
+      }
+      rest.data = { count };
+    }
+    addEvent(rest);
+  }
+  saveSoon();
+}
+
 async function checkSystem() {
   if (!ctx.runChecks) return;
   let r;
@@ -317,13 +346,15 @@ function compileDigest(sinceIso) {
   const evs = db.events.filter(e => e.at > sinceIso && e.kind !== 'digest');
   const part = (kinds) => evs.filter(e => kinds.includes(e.kind));
   const moves = part(['prediction-move']), due = part(['prediction-due']), acts = part(['story-activity']), sys = part(['system', 'tavily']);
+  const civ = part(['civic-vote', 'civic-deadline', 'civic-meeting', 'civic-activity']);
   const sections = [];
   const list = (arr) => arr.map(e => `• ${e.title}${e.body ? '\n  ' + e.body.split('\n').slice(0, 3).join('\n  ') : ''}`).join('\n');
   if (moves.length) sections.push(`PREDICTIONS\n${list(moves)}`);
   if (due.length) sections.push(`RESOLUTION DATES\n${list(due)}`);
+  if (civ.length) sections.push(`CIVIC\n${list(civ)}`);
   if (acts.length) sections.push(`STORIES WITH NEW COVERAGE\n${list(acts)}`);
   if (sys.length) sections.push(`HEADS UP\n${list(sys)}`);
-  const count = moves.length + due.length + acts.length + sys.length;
+  const count = moves.length + due.length + civ.length + acts.length + sys.length;
   return { count, title: `Lateral digest: ${count} update${count === 1 ? '' : 's'}`, message: clip(sections.join('\n\n'), 3800) || '', ids: evs.map(e => e.id) };
 }
 
@@ -358,6 +389,7 @@ async function tick() {
       lastHourly = Date.now();
       checkDue();
       await checkTavily();
+      await checkCivic();
       await watchPredictions();
     }
   } catch (e) { console.warn('[Alerts] tick error:', e.message); }
@@ -464,7 +496,7 @@ async function route(req, reqUrl, res, send) {
       // run every detector now: prediction movement, resolution dates, setup problems, Tavily credits
       const before = db.events.length;
       try { v2().listPredictions().forEach(p => checkPrediction(p.id)); } catch { /* none yet */ }
-      checkDue(); await checkSystem(); await checkTavily();
+      checkDue(); await checkSystem(); await checkTavily(); await checkCivic();
       return send(res, 200, { ok: true, newEvents: Math.max(0, db.events.length - before) });
     }
     if (sub === 'watch') { watchPredictions({ force: true }).catch(() => {}); return send(res, 202, { started: true, targets: watchTargets().length, creditsPerRun: watchCost() }); }
@@ -472,4 +504,4 @@ async function route(req, reqUrl, res, send) {
   return send(res, 404, { error: 'Unknown alerts route.' });
 }
 
-module.exports = { init, route, checkPrediction, onRefreshRun, addEvent, checkDue, runDigest, configure: applyConfig, _db: () => db };
+module.exports = { init, route, checkPrediction, onRefreshRun, addEvent, checkDue, checkCivic, runDigest, configure: applyConfig, _db: () => db };

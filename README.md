@@ -61,7 +61,51 @@ for the AI parts; cloud LLM providers are optional.
   as an anecdote until you have ten or more.
 - **Setup check and backups** — **Settings → Status** shows whether Ollama, your models, Tavily and news search are working, with the
   fix next to anything that isn't. The same screen exports your data to one file and restores it. API keys are never included.
-- **Keyboard shortcuts** — `/` search, `h` home, `n` new story, `p` new prediction, `,` settings, `t` theme, `?` for the list.
+- **Civic** — who represents you, at every level of government. Open the **Civic** tab in the left panel (or press `c`), enter one
+  street address, and Lateral finds your congressional, state senate and state house districts, your school district, and the people
+  who hold those seats (and your city council, when your city publishes one on Legistar), with email, phone and website wherever a
+  free public source has them. Seats up for election this year are flagged, and if a new congressional map changes your district
+  you are told. It needs **no accounts and no API keys**: everything comes from free public data (the U.S. Census Bureau, the
+  public-domain `congress-legislators` and `openstates/people` datasets, and Legistar). Your address goes only to the Census Bureau
+  and is **never saved**; Lateral keeps just the district numbers and your city and state. Remove them any time.
+  Each official's page lists their social accounts (Instagram, X, Facebook, YouTube, Mastodon, from the public datasets), shows
+  their recent YouTube and Mastodon posts, and lets you add any account by hand. For accounts the datasets do not have (TikTok
+  especially), an opt-in web search (it uses Tavily credits, and the page says how many first) proposes matches, tells you which
+  ones have the person's name in the handle, and saves nothing until you confirm. A **district map** draws your congressional,
+  state senate, state house, school-district and city outlines, and the new congressional map when it differs from the current
+  one. It is drawn on your computer from Census boundaries, with no map service contacted, so nothing reveals where you are looking.
+  Picking anyone (from the list, the map or the overview) opens a full profile in the right-hand column: portrait, quick actions
+  (email, call, website, Wikipedia), what they represent and when their term ends, a short Wikipedia summary, their social
+  accounts, recent videos and contact details; their district lights up on the map. Portraits come from the Congress photo sets,
+  the legislature's own headshot, or Wikipedia, and are fetched and cached by Lateral itself, so your browser never contacts those
+  sites; people without a photo get an initials tile.
+  **Other local offices.** Your **mayor** is read from Wikidata automatically (free, no key; volunteers edit it, so it can lag an
+  election, and the profile says so). The **county** (commissioners or executive), **county judges**, **sheriff** and **school board** have
+  no single free list that covers every place, so each has a **Find with a web search** button (one Tavily credit; the page says so
+  first). It asks a plain question, shows the answer and its sources, and lists the names it found. A name is offered only if it
+  appears in the results, nothing is saved until you tick it, and anyone can also be added by hand with optional email, phone and
+  website. Every person says where they came from, a mayor you remove is not quietly put back by a refresh, and these people get the same
+  profile as everyone else (portrait and Wikipedia summary when there is one, social accounts, recent videos).
+  **Watching** turns parts of your government into stories you can follow. On the Civic page, switch on what you want: your **city
+  council's** new legislation and upcoming meetings (from its Legistar site, no key), your **delegation's bills** in Congress (works
+  without a key on a shared demo key limited to about 10 requests an hour; a free Congress.gov key removes the limit), your
+  **state legislators' bills** (needs a free Open States key), and **federal rules** on topics you choose (Federal Register, no key,
+  with public-comment deadlines). Each switch creates an ordinary story that the background refresh keeps up to date; nothing is created
+  until you press Watch, and **Stop** leaves the story in your list. Alerts tell you when a bill or ordinance moves (passed, signed,
+  enacted), when a meeting is tomorrow, and when a comment period is about to close; everything else goes in the daily digest. The
+  keys are set up on the same page with a short walk-through, kept on your computer and never exported.
+  **Track a bill as a prediction.** Hover any bill or city ordinance in a Civic watch and press **Predict**. Lateral reads the bill's
+  official record (Congress.gov, Open States or the council's Legistar), asks what you are predicting (that it becomes law, passes the
+  chamber it started in, or is adopted), suggests a starting confidence from how bills like it usually go (a few percent for a newly
+  introduced bill in Congress, much higher once a chamber has passed it), and creates an ordinary prediction. The bill's own actions
+  (introduced, committee, floor votes with their tallies and a link to the roll call, signed) appear as a timeline on the prediction page.
+  The timeline is a record of what happened, not evidence: it never touches the evidence balance. When the record settles the
+  question (it became law, the chamber voted it through, the council adopted or rejected it) the prediction is resolved from it and
+  an alert says so; if the date passes with nothing happening it resolves **No**, but only after a successful look at the record, so an
+  outage never counts as an answer. A prediction you settle yourself is never overruled.
+  On a phone the two side panels (the menu on the left, details on the right) never stack: each has a Close bar, closes with a swipe
+  toward its edge or a tap on the dimmed page, and choosing someone in the Civic list swaps straight to their profile.
+- **Keyboard shortcuts** — `/` search, `h` home, `n` new story, `p` new prediction, `l` library, `c` civic, `a` activity, `,` settings, `t` theme, `?` for the list.
 - **Article images that actually load** — many news results arrive as opaque Google News links. Lateral resolves them to the real
   article, reads the page, recovers bot-blocked pages with Tavily, and runs every candidate past a small vision model so logos,
   tiny thumbnails and unrelated images are rejected. Anything left shows a clean fallback card.
@@ -122,6 +166,9 @@ as you use the app, and is **git-ignored** — only `.gitkeep` and `llm-secrets.
 | `alerts.json` | Alert settings (including your delivery-channel addresses, so **treat it as secret**), the Activity inbox, and what has already been reported. Not part of the Settings → Status export. |
 | `feeds.json` | The secret that protects your outgoing feeds, and the feeds you follow for each story. **Secret.** Not part of the Settings → Status export. |
 | `archive/` | Saved copies of articles (one JSON file each, plus `index.json`). Not part of the Settings → Status export; copy this folder to back it up. |
+| `civic-track.json` | The bills you follow as predictions: which bill each prediction tracks, what would settle it, and the official actions seen so far. Not part of the Settings → Status export. |
+| `civic-watch.json` | Which story each Civic watch feeds, your Federal Register topics, any optional Congress.gov / Open States keys (**secret**), and what has already been reported. Not part of the Settings → Status export. |
+| `civic.json`, `civic-cache/` | Your Civic profile (district numbers, city and state, and the officials found; never your street address), and cached public datasets. The profile shows roughly where you live, so it is not part of the Settings → Status export; it takes seconds to recreate. |
 | `image-cache.json`, `image-stats.json` | Resolved article image URLs, and pipeline counters including Tavily Extract usage. |
 | `intelligence.log`, `refresh-log.json`, `purged-ids.json` | Operational logs and bookkeeping. |
 
@@ -168,6 +215,15 @@ The proxy exposes a plain JSON API, so scripts and other tools can drive Lateral
 | `POST /api/lateral/alerts/test` · `/digest` · `/check` · `/watch` | Send a test message, build or send the digest (`{"preview":true}` to look), run every detector now, or run the prediction watcher now. |
 | `GET /api/lateral/feed/<secret>/activity.xml` · `/stories.xml` · `/story/<id>.xml` · `/lateral.opml` | The Atom feeds and OPML file. The secret is shown in Settings → Feeds. |
 | `POST /api/lateral/feeds/preview` · `/subs` · `/subs/remove` · `/fetch` · `/opml` | Find a feed from an address, follow or unfollow one for a story, read a story's feeds now, or import OPML. `GET /feeds/info` and `POST /feeds/token/reset` manage the secret. |
+| `GET /api/lateral/civic/profile` · `POST /civic/lookup` `{"address": …}` · `/civic/refresh` · `/civic/legistar` `{"url": …}` · `/civic/remove` | Read the Civic profile; build one from a street address (the address is not stored); re-check officials without an address; point at (or confirm) the city's Legistar site; delete the profile. |
+| `GET /api/lateral/civic/watch/list` · `GET /civic/watch/items?kind=` | The watches available for your profile (`council`, `delegation`, `state`, `rules`), whether each is on, and key status; one watch's current items. |
+| `GET /api/lateral/civic/track/preview?item=` · `GET /civic/track/get?predictionId=` · `GET /civic/track/list` | What following a bill would create (targets, resolution date, starting confidence, latest actions); the official record behind a tracked prediction; all tracked predictions. `item` is a watch item id such as `bill:119-HR-1`, `os:ocd-bill/…` or `matter:44496`. |
+| `POST /api/lateral/civic/office/discover` · `/office/add` · `/office/remove` · `/office/restore` | Local offices beyond the council: search the web for a county or school office (`{"officeId":"sheriff"}`; one Tavily credit, nothing saved), save confirmed or hand-entered people (`{"officeId"|"office","people":[…]}`), remove one, or ask Wikidata for the mayor again. |
+| `POST /api/lateral/civic/track/start` · `/refresh` · `/stop` | Create the prediction and begin following (`{"item","target":"law\|chamber\|adopt","confidence","resolveBy"}`), check the record now (at most every five minutes), or stop following. |
+| `POST /api/lateral/civic/watch/link` · `/unlink` · `/topics` · `/key` · `/key/test` | Record which story backs a watch (`{"kind","storyId"}`), stop one, set the Federal Register topics, save or remove an optional key (`{"which":"congress"\|"openstates","key"}`), or check a saved key. |
+| `GET /api/lateral/civic/photo?key=` · `GET /civic/about?key=` | One official's portrait (image bytes, cached by Lateral; 404 when there is none), and their short Wikipedia summary and link when a clear match exists. |
+| `GET /api/lateral/civic/shapes` · `GET /civic/posts?key=` | District outlines as GeoJSON (and whether the new congressional map differs); recent YouTube and Mastodon posts for one official (`key` is the official's `level\|office\|name`). |
+| `POST /api/lateral/civic/social/set` · `/remove` · `/discover` | Add an account by hand (`{"key","platform","handle"}`, a handle or a profile address), remove one you added, or web-search for missing ones (`{"key","platforms":["tiktok","instagram"]}`; 1 Tavily credit per platform, nothing saved until you set it). |
 | `GET /v2/calibration` | Track record across resolved predictions. Set an outcome with `PATCH /v2/predictions/:id` and `{"outcome":"yes"}`, `"no"` or `null` to reopen. |
 | `GET /api/lateral/health/check` | Setup check: Ollama, models, Tavily key, news search, data folder. |
 | `GET /api/lateral/backup` · `POST /api/lateral/restore` | Export your data as one JSON bundle, or restore one (`{"bundle": …, "dryRun": true}` previews without writing). |

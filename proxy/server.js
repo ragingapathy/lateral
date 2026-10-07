@@ -359,6 +359,8 @@ const ops = require('./ops');
 const archive = require('./archive');
 const alerts = require('./alerts');
 const feeds = require('./feeds');
+const civic = require('./civic');
+const civicWatch = require('./civic-watch');
 
 // ─── HTTP request helper ─────────────────────────────────────────────────────────────────
 
@@ -4324,6 +4326,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/alerts/') || pathname.startsWith('/api/lateral/alerts/')) {
     if (await alerts.route(req, reqUrl, res, send) !== false) return;
   }
+  if (pathname.startsWith('/civic/') || pathname.startsWith('/api/lateral/civic/')) {
+    if (await civic.route(req, reqUrl, res, send) !== false) return;
+  }
   if (isBackup  && req.method === 'GET')  return ops.handleBackup(res, opsCtx);
   if (isRestore && req.method === 'POST') return ops.handleRestore(req, res, opsCtx);
   if (isHealth  && req.method === 'GET')  return await ops.handleHealth(res, opsCtx);
@@ -4430,7 +4435,10 @@ async function runAutoRefresh() {
       const query = buildStoryWebDeltaQuery(story);
       // Broader time range for scheduler — not just today
       // Feeds you attached to this story join the search results (and still count if the search engines are down).
-      const feedRes = feeds.hasFeeds(story.id) ? await feeds.itemsForStory(story.id) : { items: [] };
+      const userFeeds = feeds.hasFeeds(story.id) ? await feeds.itemsForStory(story.id) : { items: [] };
+      // A Civic watch story also gets its official items (legislation, bills, rules) from civic-watch.js.
+      const civicRes = civicWatch.hasWatch(story.id) ? await civicWatch.itemsForStory(story.id) : { items: [] };
+      const feedRes = { items: [...userFeeds.items, ...civicRes.items] };
       let r = { results: [] };
       try { r = await fetchNewsFromSearx(query, { engines: NEWS_ENGINE_LIST, timeRange: 'week', timeout: 15000 }); }
       catch (searchErr) { if (!feedRes.items.length) throw searchErr; }
@@ -4515,9 +4523,12 @@ function scheduleAutoRefresh() {
 
 scheduleAutoRefresh();
 
-// ── Vane model warmup ──────────────────────────────────────────────────────────
-// Keeps the Vane chat model loaded in Ollama memory so the first user request is fast.
-// Runs once on startup (after a short delay) and then every 4 minutes.
+// ── Model warmup (opt-in) ──────────────────────────────────────────────────────
+// Keeps the chat model loaded in Ollama memory so the first AI request is fast.
+// OFF by default: pinning a model every 4 minutes evicts any larger model sharing a
+// small GPU, forcing it to reload and lose its prompt cache. Set LATERAL_MODEL_WARMUP=1
+// to enable. When enabled it runs once on startup (after a short delay) and then every 4 minutes.
+const LATERAL_MODEL_WARMUP = process.env.LATERAL_MODEL_WARMUP === '1';
 const VANE_WARMUP_OLLAMA_URL = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
 const VANE_WARMUP_MODEL      = VALE_CHAT_MODEL;
 const VANE_WARMUP_INTERVAL   = 4 * 60 * 1000; // 4 min (just under Ollama's 5-min eviction)
@@ -4541,7 +4552,9 @@ async function warmVaneModel() {
   }
 }
 
-setTimeout(() => {
-  warmVaneModel();
-  setInterval(warmVaneModel, VANE_WARMUP_INTERVAL);
-}, 10000); // wait 10s for Ollama to be ready after container start
+if (LATERAL_MODEL_WARMUP) {
+  setTimeout(() => {
+    warmVaneModel();
+    setInterval(warmVaneModel, VANE_WARMUP_INTERVAL);
+  }, 10000); // wait 10s for Ollama to be ready after container start
+}

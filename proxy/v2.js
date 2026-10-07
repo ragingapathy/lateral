@@ -56,12 +56,12 @@ function send(res, status, obj) {
 
 // ─── Tavily Search ─────────────────────────────────────────────────────────────────
 
-async function tavilySearch({ query, maxResults = 10, searchDepth = 'basic', includeDomains = [], excludeDomains = [] } = {}) {
+async function tavilySearch({ query, maxResults = 10, searchDepth = 'basic', includeDomains = [], excludeDomains = [], includeAnswer = false } = {}) {
   const tavilyKey = getTavilyKey();
   if (!tavilyKey) throw new Error('Tavily API key not configured — add it in Settings → Web search');
   const body = JSON.stringify({
     api_key: tavilyKey, query, max_results: maxResults, search_depth: searchDepth,
-    include_answer: false, include_raw_content: false, include_images: false,
+    include_answer: !!includeAnswer, include_raw_content: false, include_images: false,
     include_domains: includeDomains, exclude_domains: excludeDomains,
   });
   return new Promise((resolve, reject) => {
@@ -463,6 +463,24 @@ function handleCalibration(res) {
   });
 }
 
+// Record an outcome on a prediction object already read from the store (the caller writes it). Returns false for a bad value.
+// `extra` is merged into the stored resolution, e.g. { source: 'civic-record', note }.
+function applyOutcome(v2, p, outcome, extra) {
+  if (outcome === 'yes' || outcome === 'no') {
+    const ev = computeEvidence(v2.links.filter(l => l.predictionId === p.id), groupsFor(v2, p.id));
+    p.resolution = {
+      outcome, resolvedAt: nowIso(),
+      balance: ev.score, direction: ev.direction, strength: ev.strength,
+      supports: ev.supports, contradicts: ev.contradicts, confidence: p.confidence,
+      ...(extra || {}),
+    };
+    p.status = 'resolved';
+    return true;
+  }
+  if (outcome === null) { delete p.resolution; p.status = 'active'; return true; }
+  return false;
+}
+
 function handlePredictionPatch(req, reqUrl, res) {
   const id = require('path').basename(reqUrl.pathname);
   let chunks = [];
@@ -481,18 +499,7 @@ function handlePredictionPatch(req, reqUrl, res) {
       // Record how it turned out ('yes' | 'no'), or reopen it (null). The evidence reading at that moment is
       // frozen alongside the outcome so calibration can later compare "which way the news leaned" to what happened.
       if (body.outcome !== undefined) {
-        if (body.outcome === 'yes' || body.outcome === 'no') {
-          const ev = computeEvidence(v2.links.filter(l => l.predictionId === id), groupsFor(v2, id));
-          p.resolution = {
-            outcome: body.outcome, resolvedAt: nowIso(),
-            balance: ev.score, direction: ev.direction, strength: ev.strength,
-            supports: ev.supports, contradicts: ev.contradicts, confidence: p.confidence,
-          };
-          p.status = 'resolved';
-        } else if (body.outcome === null) {
-          delete p.resolution;
-          p.status = 'active';
-        } else return send(res, 400, { error: "outcome must be 'yes', 'no' or null" });
+        if (!applyOutcome(v2, p, body.outcome)) return send(res, 400, { error: "outcome must be 'yes', 'no' or null" });
       }
       if (Array.isArray(body.signals)) {
         p.signals = body.signals.map(s => ({
@@ -941,4 +948,26 @@ function evidenceSnapshot(predId) {
 }
 function listPredictions() { return readV2().predictions; }
 
-module.exports = { route, tavilySearch, scoreItemAgainstPrediction, suggestSignals, computeEvidence, startSearchJob, evidenceSnapshot, listPredictions, jobStatus: id => publicJob(_jobs.get(id)) };
+// For other server modules (the civic bill tracker): create a prediction and settle one, without going through HTTP.
+function createPrediction({ statement, confidence, resolutionDate, signals }) {
+  const v2 = readV2();
+  const prediction = {
+    id: uuid(), statement: String(statement).trim(), status: 'active',
+    signals: (signals || []).map(s => ({ id: uuid(), query: String(s.query || '').trim(), type: s.type || 'indicator', active: s.active !== false })).filter(s => s.query),
+    confidence: Number(confidence) || 50, resolutionDate: resolutionDate || null, createdAt: nowIso(), updatedAt: nowIso(),
+  };
+  v2.predictions.push(prediction);
+  writeV2(v2);
+  return prediction;
+}
+function getPrediction(id) { return readV2().predictions.find(p => p.id === id) || null; }
+function settlePrediction(id, outcome, extra) {
+  const v2 = readV2(), p = v2.predictions.find(x => x.id === id);
+  if (!p || p.resolution) return false;
+  if (!applyOutcome(v2, p, outcome, extra)) return false;
+  p.updatedAt = nowIso();
+  writeV2(v2);
+  return true;
+}
+
+module.exports = { ollamaJson, createPrediction, getPrediction, settlePrediction, route, tavilySearch, scoreItemAgainstPrediction, suggestSignals, computeEvidence, startSearchJob, evidenceSnapshot, listPredictions, jobStatus: id => publicJob(_jobs.get(id)) };
