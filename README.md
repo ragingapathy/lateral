@@ -26,6 +26,10 @@ for the AI parts; cloud LLM providers are optional.
 
 *A story page: the episode timeline, the latest headlines (with the relevance filter's **Check relevance** button), and video, podcast and social context.*
 
+![The Civic page: your districts and a district map, with the selected official's full profile in the right-hand column](screenshots/civic.webp)
+
+*Civic: who represents you, with a district map and a full profile for each official. See [Civic](#civic-who-represents-you).*
+
 ## Features
 
 - **Story timelines** — episodes, headlines, video and podcast context, intelligence briefs, a connection map, and shareable pages.
@@ -61,54 +65,69 @@ for the AI parts; cloud LLM providers are optional.
   as an anecdote until you have ten or more.
 - **Setup check and backups** — **Settings → Status** shows whether Ollama, your models, Tavily and news search are working, with the
   fix next to anything that isn't. The same screen exports your data to one file and restores it. API keys are never included.
-- **Civic** — who represents you, at every level of government. Open the **Civic** tab in the left panel (or press `c`), enter one
-  street address, and Lateral finds your congressional, state senate and state house districts, your school district, and the people
-  who hold those seats (and your city council, when your city publishes one on Legistar), with email, phone and website wherever a
-  free public source has them. Seats up for election this year are flagged, and if a new congressional map changes your district
-  you are told. It needs **no accounts and no API keys**: everything comes from free public data (the U.S. Census Bureau, the
-  public-domain `congress-legislators` and `openstates/people` datasets, and Legistar). Your address goes only to the Census Bureau
-  and is **never saved**; Lateral keeps just the district numbers and your city and state. Remove them any time.
-  Each official's page lists their social accounts (Instagram, X, Facebook, YouTube, Mastodon, from the public datasets), shows
-  their recent YouTube and Mastodon posts, and lets you add any account by hand. For accounts the datasets do not have (TikTok
-  especially), an opt-in web search (it uses Tavily credits, and the page says how many first) proposes matches, tells you which
-  ones have the person's name in the handle, and saves nothing until you confirm. A **district map** draws your congressional,
-  state senate, state house, school-district and city outlines, and the new congressional map when it differs from the current
-  one. It is drawn on your computer from Census boundaries, with no map service contacted, so nothing reveals where you are looking.
-  Picking anyone (from the list, the map or the overview) opens a full profile in the right-hand column: portrait, quick actions
-  (email, call, website, Wikipedia), what they represent and when their term ends, a short Wikipedia summary, their social
-  accounts, recent videos and contact details; their district lights up on the map. Portraits come from the Congress photo sets,
-  the legislature's own headshot, or Wikipedia, and are fetched and cached by Lateral itself, so your browser never contacts those
-  sites; people without a photo get an initials tile.
-  **Other local offices.** Your **mayor** is read from Wikidata automatically (free, no key; volunteers edit it, so it can lag an
-  election, and the profile says so). The **county** (commissioners or executive), **county judges**, **sheriff** and **school board** have
-  no single free list that covers every place, so each has a **Find with a web search** button (one Tavily credit; the page says so
-  first). It asks a plain question, shows the answer and its sources, and lists the names it found. A name is offered only if it
-  appears in the results, nothing is saved until you tick it, and anyone can also be added by hand with optional email, phone and
-  website. Every person says where they came from, a mayor you remove is not quietly put back by a refresh, and these people get the same
-  profile as everyone else (portrait and Wikipedia summary when there is one, social accounts, recent videos).
-  **Watching** turns parts of your government into stories you can follow. On the Civic page, switch on what you want: your **city
-  council's** new legislation and upcoming meetings (from its Legistar site, no key), your **delegation's bills** in Congress (works
-  without a key on a shared demo key limited to about 10 requests an hour; a free Congress.gov key removes the limit), your
-  **state legislators' bills** (needs a free Open States key), and **federal rules** on topics you choose (Federal Register, no key,
-  with public-comment deadlines). Each switch creates an ordinary story that the background refresh keeps up to date; nothing is created
-  until you press Watch, and **Stop** leaves the story in your list. Alerts tell you when a bill or ordinance moves (passed, signed,
-  enacted), when a meeting is tomorrow, and when a comment period is about to close; everything else goes in the daily digest. The
-  keys are set up on the same page with a short walk-through, kept on your computer and never exported.
-  **Track a bill as a prediction.** Hover any bill or city ordinance in a Civic watch and press **Predict**. Lateral reads the bill's
-  official record (Congress.gov, Open States or the council's Legistar), asks what you are predicting (that it becomes law, passes the
-  chamber it started in, or is adopted), suggests a starting confidence from how bills like it usually go (a few percent for a newly
-  introduced bill in Congress, much higher once a chamber has passed it), and creates an ordinary prediction. The bill's own actions
-  (introduced, committee, floor votes with their tallies and a link to the roll call, signed) appear as a timeline on the prediction page.
-  The timeline is a record of what happened, not evidence: it never touches the evidence balance. When the record settles the
-  question (it became law, the chamber voted it through, the council adopted or rejected it) the prediction is resolved from it and
-  an alert says so; if the date passes with nothing happening it resolves **No**, but only after a successful look at the record, so an
-  outage never counts as an answer. A prediction you settle yourself is never overruled.
-  On a phone the two side panels (the menu on the left, details on the right) never stack: each has a Close bar, closes with a swipe
-  toward its edge or a tap on the dimmed page, and choosing someone in the Civic list swaps straight to their profile.
+- **Civic** — who represents you, at every level of government, from one address that is never saved: a district map, a full profile for each official, and optional watches that turn bills, council business and federal rules into stories, with a one-click way to follow a bill as a prediction. [Details below.](#civic-who-represents-you)
 - **Keyboard shortcuts** — `/` search, `h` home, `n` new story, `p` new prediction, `l` library, `c` civic, `a` activity, `,` settings, `t` theme, `?` for the list.
 - **Article images that actually load** — many news results arrive as opaque Google News links. Lateral resolves them to the real
   article, reads the page, recovers bot-blocked pages with Tavily, and runs every candidate past a small vision model so logos,
   tiny thumbnails and unrelated images are rejected. Anything left shows a clean fallback card.
+
+## Civic: who represents you
+
+Open the **Civic** tab in the left panel (or press `c`) and enter one street address. Lateral finds your congressional, state senate
+and state house districts, your school district and the people who hold those seats, with email, phone and website wherever a free
+public source has them. Seats up for election this year are flagged, and if a new congressional map changes your district you are told.
+
+**It needs no accounts and no API keys.** Everything starts from free public data: the U.S. Census Bureau, the public-domain
+`congress-legislators` and `openstates/people` datasets, Legistar, Wikidata and Wikipedia. Your address goes only to the Census
+Bureau and is **never saved**; Lateral keeps just the district numbers and your city and state, and you can remove them any time.
+
+### The people
+
+- **A profile in the right-hand column** for anyone you pick (from the list, the map or the overview): portrait, quick actions (email,
+  call, website, Wikipedia), what they represent and when their term ends, a short Wikipedia summary, social accounts, recent videos
+  and contact details. Their district lights up on the map. Portraits come from the Congress photo sets, the legislature's own
+  headshot or Wikipedia, and are fetched and cached by Lateral itself, so your browser never contacts those sites.
+- **Social accounts** (Instagram, X, Facebook, YouTube, Mastodon) from the public datasets, with the recent YouTube and Mastodon
+  posts shown. Add any account by hand. For accounts the datasets lack (TikTok especially) an opt-in web search proposes matches,
+  says which have the person's name in the handle, and saves nothing until you confirm. It uses Tavily credits and the page says
+  how many first.
+- **A district map** of your congressional, state senate, state house, school-district and city outlines, plus the new congressional
+  map when it differs. It is drawn on your computer from Census boundaries, with no map service contacted.
+- **Other local offices.** Your **city council** is read from Legistar when your city uses it. Your **mayor** is read from Wikidata
+  automatically (volunteers edit it, so it can lag an election, and the profile says so). The **county** (commissioners or
+  executive), **county judges**, **sheriff** and **school board** have no single free list that covers every place, so each has a
+  **Find with a web search** button (one Tavily credit; the page says so first). It asks a plain question, shows the answer and its
+  sources, and lists the names it found. A name is offered only if it appears in the results, and nothing is saved until you tick it.
+  Anyone can also be added by hand. Every person says where they came from, and a mayor you remove is not put back by a refresh.
+
+### Watching
+
+On the Civic page, switch on what you want to follow: your **city council's** new legislation and upcoming meetings (Legistar, no
+key), your **delegation's bills** in Congress (works without a key on a shared demo key limited to about 10 requests an hour; a
+free Congress.gov key removes the limit), your **state legislators' bills** (needs a free Open States key), and **federal rules** on
+topics you choose (Federal Register, no key, with public-comment deadlines). Each switch creates an ordinary story that the
+background refresh keeps up to date; nothing is created until you press **Watch**, and **Stop** leaves the story in your list.
+Alerts tell you when a bill or ordinance moves (passed, signed, enacted), when a meeting is tomorrow and when a comment period is
+about to close; everything else goes in the daily digest. Keys are set up on the same page with a short walk-through, kept on your
+computer and never exported.
+
+### Follow a bill as a prediction
+
+Hover any bill or city ordinance in a watch and press **Predict**. Lateral reads the bill's official record (Congress.gov, Open
+States or the council's Legistar), asks what you are predicting (that it becomes law, passes the chamber it started in, or is
+adopted), suggests a starting confidence from how bills like it usually go (a few percent for a newly introduced bill in Congress,
+much higher once a chamber has passed it) and creates an ordinary prediction.
+
+- The bill's own actions (introduced, committee, floor votes with their tallies and a link to the roll call, signed) appear as a
+  **timeline** on the prediction page. It is a record of what happened, not evidence, and never touches the evidence balance.
+- When the record settles the question (it became law, the chamber voted it through, the council adopted or rejected it) the
+  prediction is resolved from it and an alert says so. If the date passes with nothing happening it resolves **No**, but only after
+  a successful look at the record, so an outage never counts as an answer. A prediction you settle yourself is never overruled.
+
+### On a phone
+
+The two side panels (the menu on the left, details on the right) never stack. Each has a Close bar, closes with a swipe toward its
+edge or a tap on the dimmed page, and choosing someone in the Civic list swaps straight to their profile.
 
 ## Requirements
 
@@ -249,7 +268,13 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
 - **Tavily usage.** Search and scoring use Tavily Search. Tavily Extract is only used for pages that block direct fetching, and is
   capped per day. `GET /api/lateral/images/stats` shows the counters, including estimated Extract credits.
 - **Privacy.** Everything runs locally. Outbound traffic is: your searches (through SearXNG's upstream engines and Tavily), fetching
-  the article pages you track, and any cloud LLM provider *you* configure.
+  the article pages you track, and any cloud LLM provider *you* configure. Civic adds a few public services (the Census Bureau
+  for your address, which is not saved; TIGERweb boundaries; the `congress-legislators` and `openstates/people` datasets; Legistar;
+  Wikidata and Wikipedia; Congress.gov, Open States and the Federal Register for watches), always fetched by Lateral's server, never
+  by your browser.
+- **Civic data is only as current as its sources.** Datasets can lag an election or a resignation, Wikidata is volunteer-edited, and a
+  web search can be wrong, which is why searched names always wait for your confirmation. Use **Re-check officials** from time to
+  time, and treat anything important as worth confirming on the official site, which every profile links to.
 
 ## Troubleshooting
 
@@ -263,7 +288,17 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
 - **Images missing** — check `moondream` is installed and look at `/api/lateral/images/stats`. Articles with no usable image get the
   fallback card by design.
 
-## What's new in v2.0
+## What's new
+
+**v2.2 — Civic.** Who represents you, from one address that is never saved: officials at every level with a full profile column,
+social accounts and recent videos, a local district map, your mayor, county, courts, sheriff and school board, watches for council
+business, bills and federal rules, and one-click bill tracking that settles a prediction from the official record. Phone side panels
+close with a Close bar, a swipe or a tap. Prediction pages no longer show the resolution date a day early.
+
+**v2.1.** Change alerts and the Activity inbox, RSS and Atom in and out, same-story grouping, saved copies and the Library, and market
+witnesses (Polymarket and Kalshi) on predictions.
+
+**v2.0**
 
 - Predictions with editable signals, background search-and-score with live progress, per-article overrides and re-scoring, an evidence
   balance, and share pages that include the tracked evidence.
