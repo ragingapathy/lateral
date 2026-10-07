@@ -6928,6 +6928,287 @@ function CivicOfficeForm({ form, setForm, presets, fixed, busy, onSave, onCancel
   );
 }
 
+// Local media: links to the newspapers, weekly and alternative papers, TV and radio stations that cover where you live. Found from
+// Wikipedia's lists for your city and county (volunteer-edited, so add what is missing), plus anything you add, plus an opt-in web
+// search. A side menu on a wide pane; a collapsible card on a narrow one.
+const MEDIA_KINDS = [['gov', 'Government'], ['paper', 'Newspapers and magazines'], ['tv', 'Television'], ['online', 'News sites'], ['radio', 'Radio']];
+function CivicMedia({ civic, compact, card, eyebrow }) {
+  const [d, setD] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', url: '', kind: 'paper' });
+  const [cands, setCands] = useState(null);
+  const [picked, setPicked] = useState({});
+  const [confirmSearch, setConfirmSearch] = useState(false);
+  const [open, setOpen] = useState({ radio: false, hidden: false, card: false });
+  const load = () => civicJson('media/list').then(x => { if (!x.error) setD(x); });
+  useEffect(() => { setD(null); load(); }, [civic.label]);
+  const apply = x => { if (x.error) { setErr(x.error); return false; } setErr(''); setD(x); return true; };
+
+  async function addOutlet() {
+    setBusy('add');
+    const x = await civicPost('media/add', form);
+    setBusy('');
+    if (apply(x)) { setForm({ name: '', url: '', kind: 'paper' }); setAdding(false); }
+  }
+  async function search() {
+    setConfirmSearch(false); setBusy('search'); setErr('');
+    const x = await civicPost('media/search', {});
+    setBusy('');
+    if (x.error) { setErr(x.error); return; }
+    setCands(x.candidates || []); setPicked({});
+  }
+  async function addPicked() {
+    setBusy('add');
+    let last = null;
+    for (const c of cands.filter(c => picked[c.url])) last = await civicPost('media/add', { name: c.name, url: c.url, kind: c.kind, source: 'search' });
+    setBusy('');
+    if (last) apply(last);
+    setCands(null);
+  }
+  const hide = async it => { apply(await civicPost(it.manual ? 'media/remove' : 'media/hide', it.manual ? { id: it.id } : { key: it.key })); };
+  const restore = async it => { apply(await civicPost('media/restore', { key: it.key })); };
+
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.5};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:11.5,padding:0,textAlign:'left'};
+  const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  const row = (it, i) => (
+    <div key={it.key || i} style={{display:'flex',alignItems:'flex-start',gap:6,padding:'4px 0'}}>
+      <a href={it.url} target="_blank" rel="noopener noreferrer" title={it.desc || it.url} style={{flex:1,minWidth:0,textDecoration:'none',lineHeight:1.3}}>
+        <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.name}{it.manual ? ' ★' : ''}</span>
+        <span style={{display:'block',fontSize:10.5,color:C.textMute,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{hostOf(it.url)}</span>
+      </a>
+      <button onClick={() => hide(it)} title={it.manual ? 'Remove this outlet' : 'Hide this outlet'} style={{background:'none',border:'none',cursor:'pointer',color:C.textMute,fontSize:13,lineHeight:1,padding:'1px 2px'}}>✕</button>
+    </div>
+  );
+  const groups = d ? d.groups : {};
+  const total = d ? Object.values(groups).reduce((n, g) => n + g.length, 0) : 0;
+
+  const body = (
+    <div>
+      {!d && <div style={small}>Looking up the papers and stations for {civic.label}…</div>}
+      {d && total === 0 && !d.error && <div style={small}>Nothing was found automatically. Add your local sites and papers below, or try a web search.</div>}
+      {d && d.error && total === 0 && <div style={{...small,color:'#991b1b'}}>{d.error} <button onClick={async () => apply(await civicPost('media/refresh', {}))} style={link}>Try again</button></div>}
+      {MEDIA_KINDS.map(([kind, label]) => {
+        const list = groups[kind] || [];
+        if (!list.length) return null;
+        const collapsed = kind === 'radio' && !open.radio;
+        return (
+          <div key={kind} style={{marginTop:10}}>
+            {kind === 'radio'
+              ? <button onClick={() => setOpen(o => ({ ...o, radio: !o.radio }))} style={{...link,color:C.textMute,fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.07em'}}>{open.radio ? '▾' : '▸'} {label} ({list.length})</button>
+              : <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:2}}>{label}</div>}
+            {!collapsed && list.map(row)}
+          </div>
+        );
+      })}
+
+      {d && (d.quick || []).length > 0 && (
+        <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${C.borderLight}`}}>
+          <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:3}}>Look up</div>
+          {d.quick.map(q => <div key={q.url} style={{padding:'2px 0'}}><a href={q.url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:600,color:C.accent,textDecoration:'none'}}>{q.name} ↗</a></div>)}
+        </div>
+      )}
+
+      <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${C.borderLight}`,display:'flex',flexDirection:'column',gap:6}}>
+        {adding ? (
+          <div>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Name, e.g. Toledo Journal or County Auditor" style={{...inputStyle,fontSize:12,padding:'5px 8px',marginBottom:5}}/>
+            <input value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') addOutlet(); }} placeholder="Web address, e.g. toledojournal.com" style={{...inputStyle,fontSize:12,padding:'5px 8px',marginBottom:5}}/>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12,padding:'4px 6px'}}>
+                <option value="paper">Newspaper</option><option value="tv">TV</option><option value="radio">Radio</option><option value="online">News site</option><option value="gov">Government site</option>
+              </select>
+              <Btn onClick={addOutlet} disabled={busy === 'add' || !form.url.trim()} style={{padding:'4px 10px',fontSize:11.5}}>Add</Btn>
+              <button onClick={() => { setAdding(false); setErr(''); }} style={{...link,color:C.textMute,fontWeight:500}}>Cancel</button>
+            </div>
+          </div>
+        ) : <button onClick={() => setAdding(true)} style={link}>+ Add an outlet</button>}
+
+        {cands === null
+          ? (confirmSearch
+              ? <div style={small}>A web search uses one Tavily credit. <button onClick={search} style={link}>Search</button> <button onClick={() => setConfirmSearch(false)} style={{...link,color:C.textMute,fontWeight:500}}>Cancel</button></div>
+              : <button onClick={() => setConfirmSearch(true)} disabled={busy === 'search'} style={link}>{busy === 'search' ? 'Searching…' : '⌕ Find more with a web search'}</button>)
+          : (
+            <div style={{padding:'8px 9px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+              <div style={{...small,marginBottom:4}}>{cands.length ? 'Tick the ones that are local outlets, then add them:' : 'No new outlets turned up.'}</div>
+              {cands.map(c => (
+                <label key={c.url} style={{display:'flex',gap:6,alignItems:'flex-start',padding:'3px 0',cursor:'pointer',fontSize:12,color:C.text}}>
+                  <input type="checkbox" checked={!!picked[c.url]} onChange={e => setPicked(p => ({ ...p, [c.url]: e.target.checked }))} style={{marginTop:2}}/>
+                  <span style={{minWidth:0}}><strong>{c.name}</strong><span style={{display:'block',fontSize:10.5,color:C.textMute,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.host}</span></span>
+                </label>
+              ))}
+              <div style={{display:'flex',gap:8,marginTop:6}}>
+                {cands.length > 0 && <Btn onClick={addPicked} disabled={busy === 'add' || !Object.values(picked).some(Boolean)} style={{padding:'4px 10px',fontSize:11.5}}>Add ticked</Btn>}
+                <button onClick={() => setCands(null)} style={{...link,color:C.textMute,fontWeight:500}}>Close</button>
+              </div>
+            </div>
+          )}
+
+        <button onClick={async () => { setBusy('refresh'); apply(await civicPost('media/refresh', {})); setBusy(''); }} disabled={busy === 'refresh'} style={{...link,color:C.textMute,fontWeight:500}}>{busy === 'refresh' ? 'Reading Wikipedia…' : '↻ Re-read Wikipedia'}</button>
+        {d && d.hidden && d.hidden.length > 0 && (
+          <div>
+            <button onClick={() => setOpen(o => ({ ...o, hidden: !o.hidden }))} style={{...link,color:C.textMute,fontWeight:500}}>{open.hidden ? '▾' : '▸'} {d.hidden.length} hidden</button>
+            {open.hidden && d.hidden.map(it => <div key={it.key} style={{display:'flex',gap:6,fontSize:11.5,color:C.textMute,padding:'2px 0'}}><span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.name}</span><button onClick={() => restore(it)} style={link}>Restore</button></div>)}
+          </div>
+        )}
+        {err && <div style={{fontSize:11.5,color:'#991b1b',lineHeight:1.45}}>{err}</div>}
+        <div style={{...small,fontSize:10.5}}>Found from Wikipedia's lists for your city and county, which volunteers edit, so a small paper can be missing. ★ marks ones you added.</div>
+      </div>
+    </div>
+  );
+
+  // A narrow pane: a collapsible card near the top. A wide pane: the side menu itself.
+  if (compact) {
+    return (
+      <div style={card}>
+        <button onClick={() => setOpen(o => ({ ...o, card: !o.card }))} style={{...eyebrow,background:'none',border:'none',cursor:'pointer',padding:0,marginBottom:open.card ? 8 : 0,display:'flex',gap:6,alignItems:'center',width:'100%'}}>
+          <span>{open.card ? '▾' : '▸'}</span><span>Local media{d ? ` (${total})` : ''}</span><span style={{fontWeight:500,textTransform:'none',letterSpacing:0}}>government sites, papers, TV and radio</span>
+        </button>
+        {open.card && body}
+      </div>
+    );
+  }
+  return (
+    <div style={{background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'13px 14px',maxHeight:'calc(100vh - 140px)',overflowY:'auto'}}>
+      <div style={{...eyebrow,marginBottom:2}}>Local media</div>
+      <div style={{...small,marginBottom:2}}>Government sites, papers, TV and radio for {d && d.place ? d.place : civic.label}</div>
+      {body}
+    </div>
+  );
+}
+
+// Local news for the governments that represent you: your city and county first, then your state, then schools and the community.
+// Searches are built from your profile (place, county, state, mayor, governor, school district), every group is judged against its own
+// topic by the same relevance judge the stories use, repeats of one story are folded together, and anything removed can be restored.
+const CIVIC_NEWS_KEY = 'lateral-civic-news-v1';
+const CIVIC_NEWS_TTL = 3 * 3600 * 1000;
+function civicNewsPlan(civic) {
+  const j = civic.jurisdictions || {};
+  const bare = s => String(s || '').replace(/\s+(city|town|village|borough|township|CDP)$/i, '').trim();
+  const place = bare(j.place && j.place.name), county = String((j.county && j.county.name) || '').trim();
+  const stName = (j.state && j.state.name) || '', st = (j.state && j.state.abbr) || '';
+  const school = (j.schoolDistricts && j.schoolDistricts[0] && j.schoolDistricts[0].name) || '';
+  const offs = civic.officials || [];
+  const mayor = (offs.find(o => /^mayor$/i.test(o.office)) || {}).name || '';
+  const gov = (offs.find(o => o.office === 'Governor') || {}).name || '';
+  const where = place || county;
+  const groups = [];
+  const q = list => [...new Set(list.filter(Boolean))].slice(0, 5);
+  if (where) {
+    groups.push({
+      key: 'city', title: place ? `${place}${county ? ' and ' + county : ''}: city and county government` : `${county}: county government`,
+      queries: place
+        ? q([`"${place}" city council ${st}`, `"${place}" mayor ${st}`, `${place} ${st} city government budget`, mayor && `"${mayor}" ${place}`, county && `"${county}" commissioners ${st}`])
+        : q([`"${county}" commissioners ${st}`, `${county} ${st} county government`]),
+      rctx: { topic: `Government and public affairs of ${where}, ${st || stName}`, ctx: `News about the government of ${where}${county && place ? ' and ' + county : ''}: city council and mayor, ordinances and budgets, city and county services, planning and zoning, public works, local elections and ballot measures, local courts. Not sports scores, entertainment, weather, or other cities.` },
+    });
+  }
+  if (stName) {
+    groups.push({
+      key: 'state', title: `${stName}: state government`,
+      queries: q([`${stName} legislature`, `${stName} state government ${where}`, gov ? `Governor ${gov} ${stName}` : `${stName} governor`]),
+      rctx: { topic: `${stName} state government and politics`, ctx: `News about the government of ${stName}: the governor, the legislature, state agencies, state laws and budget, state courts, elections and ballot measures. Not other states, stories only about national politics, sports, or entertainment.` },
+    });
+  }
+  if (where) {
+    groups.push({
+      key: 'community', title: school ? 'Schools and community' : `${where}: community`,
+      queries: q([school && `"${school}" school board`, `${where} ${st} local news`]),
+      rctx: { topic: `${school || where} schools and community news`, ctx: `News about ${school ? 'the ' + school + ' (school board, levies, schools) and ' : ''}the community of ${where}: local services, neighborhoods, development, public safety policy. Not sports scores or other places.` },
+    });
+  }
+  return groups;
+}
+
+function CivicNews({ civic, onStartStory, card, eyebrow }) {
+  const plan = React.useMemo(() => civicNewsPlan(civic), [civic.label, (civic.officials || []).length]);
+  const cacheKey = civic.label || '';
+  const readCache = () => { try { const c = JSON.parse(localStorage.getItem(CIVIC_NEWS_KEY)); return c && c.key === cacheKey ? c : null; } catch { return null; } };
+  const [data, setData] = useState(readCache);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const runRef = React.useRef(0);
+
+  function persist(next) { setData(next); try { localStorage.setItem(CIVIC_NEWS_KEY, JSON.stringify(next)); } catch {} }
+
+  async function load() {
+    if (!plan.length) return;
+    const run = ++runRef.current;
+    setBusy(true); setErr('');
+    try {
+      const out = {};
+      await Promise.all(plan.map(async g => {
+        const results = await Promise.all(g.queries.map(qq => searchArticles(qq).catch(() => [])));
+        const seen = new Set();
+        const merged = results.flat().filter(a => a && a.url && a.title && !seen.has(a.url) && seen.add(a.url) && !isSportsArticle(a))
+          .sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 18);
+        const gate = await checkRelevance(g.rctx, merged);
+        out[g.key] = { items: gate.kept, filtered: gate.filtered };
+      }));
+      if (run !== runRef.current) return;
+      // A story shows up once: the first group (city, then state, then community) keeps it.
+      const taken = new Set();
+      for (const g of plan) {
+        const grp = out[g.key] || { items: [], filtered: [] };
+        grp.items = grp.items.filter(a => !taken.has(a.url)).slice(0, 9);
+        grp.items.forEach(a => taken.add(a.url));
+        out[g.key] = grp;
+      }
+      const total = Object.values(out).reduce((n, g) => n + g.items.length, 0);
+      if (!total) setErr('No recent local stories came back. The news search may be down; try again in a moment.');
+      persist({ key: cacheKey, at: Date.now(), groups: out });
+      // Fill in pictures afterwards so the list appears first.
+      const withImg = {};
+      for (const g of plan) withImg[g.key] = { ...out[g.key], items: await attachImages(out[g.key].items).catch(() => out[g.key].items) };
+      if (run === runRef.current) persist({ key: cacheKey, at: Date.now(), groups: withImg });
+    } catch (e) { if (run === runRef.current) setErr(e.message || 'Could not load local news.'); }
+    finally { if (run === runRef.current) setBusy(false); }
+  }
+  useEffect(() => {
+    const c = readCache();
+    if (!c || Date.now() - c.at > CIVIC_NEWS_TTL) load();
+    return () => { runRef.current++; };
+  }, [cacheKey]);
+
+  function restore(g, a) {
+    const { relevance, ...clean } = a;
+    restoreRelevance(g.rctx, a);
+    const cur = (data && data.groups[g.key]) || { items: [], filtered: [] };
+    persist({ ...data, groups: { ...data.groups, [g.key]: { items: [...cur.items, clean].sort((x, y) => String(y.date || '').localeCompare(String(x.date || ''))), filtered: cur.filtered.filter(x => x.url !== a.url) } } });
+  }
+
+  if (!plan.length) return null;
+  const ago = data && data.at ? (() => { const m = Math.max(0, Math.round((Date.now() - data.at) / 60000)); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} hr ago`; })() : '';
+  const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 10 };
+  return (
+    <div style={card}>
+      <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
+        <div style={{...eyebrow,marginBottom:0}}>Local news</div>
+        <span style={{fontSize:11.5,color:C.textMute}}>{busy ? (data ? 'Refreshing…' : 'Searching…') : ago ? `Updated ${ago}` : ''}</span>
+        <button onClick={load} disabled={busy} style={{marginLeft:'auto',background:'none',border:'none',cursor:busy ? 'default' : 'pointer',color:busy ? C.textMute : C.accent,fontSize:12,fontWeight:700,padding:0}}>↻ Refresh</button>
+      </div>
+      <div style={{fontSize:12,color:C.textMute,lineHeight:1.55,marginBottom:10}}>What is being reported about the governments that represent you, city and county first, then your state. Stories that are not really about them are filtered out, and you can restore any.</div>
+      {err && <div style={{fontSize:12,color:'#991b1b',marginBottom:8}}>{err}</div>}
+      {!data && busy && <div style={{fontSize:12.5,color:C.textMute,padding:'10px 0'}}>Searching the news for {civic.label}…</div>}
+      {plan.map(g => {
+        const grp = data && data.groups && data.groups[g.key];
+        if (!grp || (!grp.items.length && !grp.filtered.length)) return null;
+        return (
+          <div key={g.key} style={{marginTop:12}}>
+            <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:8,fontFamily:"'Playfair Display', Georgia, serif"}}>{g.title}</div>
+            {grp.items.length === 0
+              ? <div style={{fontSize:12,color:C.textMute}}>Nothing recent that is really about this.</div>
+              : <div style={grid}><GroupedCards articles={grp.items} render={(a, also, i) => <ArticleCard key={a.url || i} article={a} also={also} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>}/></div>}
+            <FilteredOutList items={grp.filtered} onRestore={a => restore(g, a)} padX={0}/>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Boards and agendas: a county board, a school board, a Granicus city or any feed, added by pasting an address. Each one can then be
 // watched like the council (see CivicWatch). Nothing is added until you press Add.
 const BOARD_SCOPES = [['county', 'County government'], ['school', 'School board'], ['city', 'City'], ['other', 'Something else']];
@@ -7055,8 +7336,18 @@ function CivicBoards({ civic, onChange, onChanged, card, eyebrow }) {
   );
 }
 
-function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStory }) {
+function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStory, onStartStory }) {
   const [bv, setBv] = useState(0);   // bumps when boards change, so the Watching card reloads
+  const wrapRef = React.useRef(null);
+  const [wide, setWide] = useState(false);   // room for the Local media side menu beside the cards
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setWide(el.clientWidth >= 940);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el); window.addEventListener('resize', measure); measure();
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [!!civic]);
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -7123,10 +7414,13 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
   const loc = civic.local;
   const cov = civic.coverage || { got: [], missing: [] };
   return (
-    <div style={wrap}>
-      <div style={{maxWidth:760,margin:'0 auto'}}>
+    <div style={wrap} ref={wrapRef}>
+      <div style={{maxWidth: wide ? 1100 : 760, margin:'0 auto', display: wide ? 'grid' : 'block', gridTemplateColumns:'minmax(0,1fr) 250px', gap:24, alignItems:'start'}}>
+      <div style={{minWidth:0}}>
         <div style={title}>Civic</div>
-        <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:16}}>Who represents you in <strong>{civic.label}</strong>. Pick a name on the left, on the map, or from the list below to open their profile on the right.</div>
+        <div style={{fontSize:13,color:C.textMid,lineHeight:1.6,marginBottom:16}}>Who represents you in <strong>{civic.label}</strong>, and what is happening in those governments. Pick a name in the list on the left or on the map to open their profile on the right.</div>
+
+        {!wide && <CivicMedia civic={civic} compact card={card} eyebrow={eyebrow}/>}
 
         <div style={card}>
           <div style={eyebrow}>Your districts</div>
@@ -7140,6 +7434,8 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
           <div style={eyebrow}>On the map</div>
           <CivicMap civic={civic} onSelect={onSelect} selKey={selKey}/>
         </div>
+
+        <CivicNews civic={civic} onStartStory={onStartStory} card={card} eyebrow={eyebrow}/>
 
         <div style={card}>
           <div style={eyebrow}>What was found</div>
@@ -7176,29 +7472,6 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
 
         <CivicWatch civicAsOf={`${civic.asOf}:${bv}`} onAddStory={onAddStory} onOpenStory={onOpenStory}/>
 
-        {CIVIC_LEVELS.map(([lv, ttl]) => {
-          const list = lv === 'local' ? civicSortLocal(officials.filter(o => o.level === lv)) : officials.filter(o => o.level === lv);
-          if (!list.length) return null;
-          return (
-            <div key={lv} style={card}>
-              <div style={eyebrow}>{ttl}</div>
-              {list.map(o => {
-                const on = civicKey(o) === selKey;
-                return (
-                  <button key={civicKey(o)} onClick={() => onSelect(civicKey(o))}
-                    style={{display:'flex',alignItems:'baseline',gap:10,textAlign:'left',background:on ? C.accent + '14' : 'none',border:'none',borderBottom:`1px solid ${C.borderLight}`,cursor:'pointer',padding:'7px 6px',margin:'0 -6px',borderRadius:on ? 6 : 0,width:'calc(100% + 12px)'}}>
-                    <span style={{fontSize:13,fontWeight:on ? 800 : 700,color:C.text}}>{o.name}</span>
-                    <span style={{fontSize:12,color:C.textMute,flex:1}}>{civicOfficeLine(o)}</span>
-                    {o.upForElection && <span style={{fontSize:10.5,fontWeight:700,color:'#92400e'}}>on the ballot {o.nextElection}</span>}
-                    {!o.upForElection && civicTermSoon(o) && <span style={{fontSize:10.5,fontWeight:700,color:'#92400e'}}>term ends {civicDate(o.termEnds)}</span>}
-                    <span style={{fontSize:11.5,color:C.textMute}}>{o.email ? '✉' : ''} {o.phone ? '☎' : ''} {(o.social || []).length ? '@' + (o.social || []).length : ''}</span>
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })}
-
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
           <Btn variant="secondary" onClick={() => run('refresh', () => civicPost('refresh'))} disabled={!!busy} style={{padding:'6px 12px',fontSize:12}}>{busy === 'refresh' ? 'Checking…' : 'Re-check officials'}</Btn>
           {!confirmRemove
@@ -7218,6 +7491,8 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
             <div style={{fontSize:11.5,color:C.textMute,marginTop:8,lineHeight:1.6}}>Everything here comes from free public sources and needs no keys. Your address went only to the U.S. Census Bureau and was not saved. Profile checked {civicDate(civic.asOf)}.</div>
           </div>
         )}
+      </div>
+      {wide && <aside style={{position:'sticky',top:0}}><CivicMedia civic={civic}/></aside>}
       </div>
     </div>
   );
@@ -15646,7 +15921,7 @@ function App() {
         )}
         <div style={{flex:1,minWidth:0,display:'flex',overflow:'hidden'}}>
           {activeView==='civic'
-            ? <CivicCenter civic={civic} selKey={civicSel} onSelect={setCivicSel} onChange={p => { setCivic(p); setCivicSel(null); }} onUpdate={setCivic} onAddStory={addStory} onOpenStory={openStoryById}/>
+            ? <CivicCenter civic={civic} selKey={civicSel} onSelect={setCivicSel} onChange={p => { setCivic(p); setCivicSel(null); }} onUpdate={setCivic} onAddStory={addStory} onOpenStory={openStoryById} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}}/>
             : activeView==='library'
             ? <LibraryCenter keyId={libKey} stories={storiesView} onSelectKey={setLibKey} onFilterStory={setLibStory} onOpenStory={id=>{const st=storiesView.find(x=>x.id===id); setActiveView(st&&st.predictionId?'predictions':'stories'); setSelStory(id); setSelEp(null); setHomeView(false);}} onChanged={()=>setLibTick(t=>t+1)} tick={libTick}/>
             : homeView
