@@ -6932,6 +6932,8 @@ function CivicOfficeForm({ form, setForm, presets, fixed, busy, onSave, onCancel
 // Wikipedia's lists for your city and county (volunteer-edited, so add what is missing), plus anything you add, plus an opt-in web
 // search. A side menu on a wide pane; a collapsible card on a narrow one.
 const MEDIA_KINDS = [['gov', 'Government'], ['paper', 'Newspapers and magazines'], ['tv', 'Television'], ['online', 'News sites'], ['radio', 'Radio']];
+// Each kind of source gets its own colour and icon so the sections read as separate blocks.
+const MEDIA_STYLE = { gov: { color: '#2563eb', icon: '🏛️' }, paper: { color: '#b45309', icon: '📰' }, tv: { color: '#9333ea', icon: '📺' }, online: { color: '#059669', icon: '🌐' }, radio: { color: '#0891b2', icon: '📻' } };
 function CivicMedia({ civic, compact, card, eyebrow }) {
   const [d, setD] = useState(null);
   const [busy, setBusy] = useState('');
@@ -6974,7 +6976,7 @@ function CivicMedia({ civic, compact, card, eyebrow }) {
   const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:11.5,padding:0,textAlign:'left'};
   const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
   const row = (it, i) => (
-    <div key={it.key || i} style={{display:'flex',alignItems:'flex-start',gap:6,padding:'4px 0'}}>
+    <div key={it.key || i} style={{display:'flex',alignItems:'flex-start',gap:6,padding:'5px 0',borderTop:i ? `1px solid ${C.borderLight}` : 'none'}}>
       <a href={it.url} target="_blank" rel="noopener noreferrer" title={it.desc || it.url} style={{flex:1,minWidth:0,textDecoration:'none',lineHeight:1.3}}>
         <span style={{display:'block',fontSize:12.5,fontWeight:700,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{it.name}{it.manual ? ' ★' : ''}</span>
         <span style={{display:'block',fontSize:10.5,color:C.textMute,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{hostOf(it.url)}</span>
@@ -6994,20 +6996,30 @@ function CivicMedia({ civic, compact, card, eyebrow }) {
         const list = groups[kind] || [];
         if (!list.length) return null;
         const collapsed = kind === 'radio' && !open.radio;
+        const st = MEDIA_STYLE[kind] || { color: C.textMute, icon: '•' };
+        const headStyle = {display:'flex',alignItems:'center',gap:7,width:'100%',padding:'7px 10px',background:st.color + '22',border:'none',textAlign:'left',fontSize:10.5,fontWeight:800,color:C.text,textTransform:'uppercase',letterSpacing:'0.07em'};
+        const head = (
+          <>
+            <span style={{fontSize:15,lineHeight:1}}>{st.icon}</span>
+            <span style={{flex:1,minWidth:0}}>{label}</span>
+            <span style={{fontSize:10.5,fontWeight:800,color:'#fff',background:st.color,borderRadius:9,padding:'0 7px',lineHeight:'16px'}}>{list.length}</span>
+            {kind === 'radio' && <span style={{color:st.color,fontSize:11}}>{open.radio ? '▾' : '▸'}</span>}
+          </>
+        );
         return (
-          <div key={kind} style={{marginTop:10}}>
+          <div key={kind} style={{marginTop:12,border:`1px solid ${st.color}55`,borderLeft:`4px solid ${st.color}`,borderRadius:8,overflow:'hidden',background:st.color + '0d'}}>
             {kind === 'radio'
-              ? <button onClick={() => setOpen(o => ({ ...o, radio: !o.radio }))} style={{...link,color:C.textMute,fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.07em'}}>{open.radio ? '▾' : '▸'} {label} ({list.length})</button>
-              : <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:2}}>{label}</div>}
-            {!collapsed && list.map(row)}
+              ? <button onClick={() => setOpen(o => ({ ...o, radio: !o.radio }))} style={{...headStyle,cursor:'pointer'}}>{head}</button>
+              : <div style={headStyle}>{head}</div>}
+            {!collapsed && <div style={{padding:'2px 10px 5px'}}>{list.map(row)}</div>}
           </div>
         );
       })}
 
       {d && (d.quick || []).length > 0 && (
-        <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${C.borderLight}`}}>
-          <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:3}}>Look up</div>
-          {d.quick.map(q => <div key={q.url} style={{padding:'2px 0'}}><a href={q.url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:600,color:C.accent,textDecoration:'none'}}>{q.name} ↗</a></div>)}
+        <div style={{marginTop:12,border:`1px solid ${C.textMute}55`,borderLeft:`4px solid ${C.textMute}`,borderRadius:8,overflow:'hidden',background:C.textMute + '0d'}}>
+          <div style={{display:'flex',alignItems:'center',gap:7,padding:'7px 10px',background:C.textMute + '22',fontSize:10.5,fontWeight:800,color:C.text,textTransform:'uppercase',letterSpacing:'0.07em'}}><span style={{fontSize:15,lineHeight:1}}>🔎</span>Look up</div>
+          <div style={{padding:'3px 10px 6px'}}>{d.quick.map(q => <div key={q.url} style={{padding:'2px 0'}}><a href={q.url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:600,color:C.accent,textDecoration:'none'}}>{q.name} ↗</a></div>)}</div>
         </div>
       )}
 
@@ -7120,6 +7132,195 @@ function civicNewsPlan(civic) {
     });
   }
   return groups;
+}
+
+// ── Civic: voting dates and your ballot ──────────────────────────────────────
+// Dates come from the state in your profile (no address needed). The ballot itself comes from Google Civic and needs a free key
+// and your street address, which goes to Google for that one request.
+function CivicBallot({ civic, card, eyebrow }) {
+  const [st, setSt] = useState(null);
+  const [addr, setAddr] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [keyDraft, setKeyDraft] = useState('');
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [open, setOpen] = useState({});
+  const [notes, setNotes] = useState({});
+  const [showRaces, setShowRaces] = useState(false);
+  const apply = d => { if (d && d.error) setErr(d.error); else setErr(''); if (d && 'hasKey' in d) { setSt(d); if (d.ballot && d.ballot.explain) setNotes(n => ({ ...d.ballot.explain, ...n })); } };
+  useEffect(() => { civicJson('ballot/status').then(apply); }, [civic.asOf]);
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.55};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:12,padding:0};
+  const chip = (bg, fg, bd) => ({fontSize:10.5,fontWeight:800,color:fg,background:bg,border:`1px solid ${bd}`,borderRadius:10,padding:'1px 8px',whiteSpace:'nowrap'});
+  const sch = st && st.schedule;
+  const ballot = st && st.ballot;
+
+  async function saveKey() {
+    if (!keyDraft.trim() || busy) return;
+    setBusy('key'); setErr('');
+    try {
+      const r = await fetch('/api/lateral/llm/secrets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ googleCivicApiKey: keyDraft.trim() }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.googleCivicConfigured) throw new Error(d.error || 'The key was not saved.');
+      setKeyDraft('');
+      apply(await civicJson('ballot/status'));
+    } catch (e) { setErr(e.message); }
+    setBusy('');
+  }
+  async function find() {
+    if (busy) return;
+    setBusy('find'); setErr('');
+    const d = await civicPost('ballot/lookup', { address: addr, remember });
+    setBusy(''); apply(d);
+    if (!d.error) setAddr('');
+  }
+  async function refresh() { setBusy('find'); setErr(''); const d = await civicPost('ballot/refresh', {}); setBusy(''); apply(d); }
+  async function forget() { setBusy('forget'); const d = await civicPost('ballot/forget', {}); setBusy(''); apply(d); setNotes({}); }
+  async function explain(id) {
+    setBusy('x' + id); setErr('');
+    const d = await civicPost('ballot/explain', { id });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    setNotes(n => ({ ...n, [id]: d.note }));
+  }
+  const when = (day) => (day ? civicDate(day) : '');
+  const dayWord = n => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : n > 1 ? `in ${n} days` : `${-n} day${n === -1 ? '' : 's'} ago`);
+
+  const site = (s, k) => (
+    <div key={k} style={{padding:'6px 0',borderTop:k ? `1px solid ${C.borderLight}` : 'none'}}>
+      <div style={{fontSize:12.5,fontWeight:700,color:C.text}}>{s.name}</div>
+      {s.address && <div style={small}>{s.address}</div>}
+      {(s.start || s.end || s.hours) && <div style={small}>{[s.start && s.end ? `${civicDate(s.start)} – ${civicDate(s.end)}` : (s.start ? 'From ' + civicDate(s.start) : ''), s.hours].filter(Boolean).join(' · ')}</div>}
+      {s.notes && <div style={small}>{s.notes}</div>}
+    </div>
+  );
+  const measures = ballot ? ballot.contests.filter(c => c.kind === 'measure') : [];
+  const races = ballot ? ballot.contests.filter(c => c.kind === 'race') : [];
+  const levelLabel = { state: 'Statewide', district: 'District', local: 'Local', '': 'Other' };
+
+  return (
+    <div style={card}>
+      <div style={eyebrow}>Voting dates and your ballot</div>
+      {!st && <div style={small}>Loading…</div>}
+
+      {sch && (
+        <div style={{marginBottom:ballot || (st && st.hasProfile) ? 14 : 0}}>
+          <div style={{fontSize:13,fontWeight:800,color:C.text}}>{sch.electionName || 'General election'} · {civicDate(sch.electionDay)} <span style={{fontWeight:600,color:C.textMid}}>({dayWord(sch.daysToElection)})</span></div>
+          <div style={{...small,marginBottom:6}}>For {sch.stateName}{sch.supported ? `. Read from the state's election office on ${civicDate(sch.checked)}; confirm with your county board of elections.` : '.'}</div>
+          {sch.items.map(i => (
+            <div key={i.id} style={{display:'flex',gap:10,alignItems:'baseline',flexWrap:'wrap',padding:'5px 0',borderTop:`1px solid ${C.borderLight}`,opacity:i.past && i.id !== 'election' ? 0.55 : 1}}>
+              <div style={{width:92,flexShrink:0,fontSize:12.5,fontWeight:700,color:C.text}}>{when(i.date)}</div>
+              <div style={{flex:'1 1 220px',minWidth:0}}>
+                <span style={{fontSize:13,color:C.text,textDecoration:i.past && i.id !== 'election' ? 'line-through' : 'none'}}>{i.label}</span>{' '}
+                {i.next && <span style={chip('#dcfce7','#166534','#86efac')}>Next · {dayWord(i.days)}</span>}
+                {i.past && i.id !== 'election' && <span style={chip(C.bg,C.textMute,C.borderLight)}>passed</span>}
+                {i.note && <div style={small}>{i.note}</div>}
+              </div>
+            </div>
+          ))}
+          {sch.note && <div style={{...small,marginTop:6}}>{sch.note}</div>}
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:6}}>{sch.links.map(l => <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" style={{...link,textDecoration:'none'}}>{l.label} ↗</a>)}</div>
+        </div>
+      )}
+
+      {st && !st.hasKey && (
+        <div style={{padding:'10px 12px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>See what is on your ballot</div>
+          <div style={{...small,marginBottom:8}}>The measures and races on your ballot, early-voting sites, drop boxes and your polling place come from Google's free Civic Information API. Create a key in Google Cloud (enable "Civic Information API"), paste it here, and it stays on this computer.</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <input type="password" value={keyDraft} onChange={e => setKeyDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveKey(); }} placeholder="Google Civic API key" style={{...inputStyle,flex:'1 1 240px',fontSize:12.5,padding:'7px 10px'}}/>
+            <Btn onClick={saveKey} disabled={!keyDraft.trim() || !!busy} style={{padding:'6px 14px',fontSize:12}}>{busy === 'key' ? 'Saving…' : 'Save key'}</Btn>
+          </div>
+        </div>
+      )}
+
+      {st && st.hasKey && !ballot && (
+        <div style={{padding:'10px 12px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>See what is on your ballot</div>
+          <div style={{...small,marginBottom:8}}>Enter the address you are registered at. Google receives it for this lookup (the address lookup above this uses the US Census Bureau instead). Lateral does not keep it unless you tick the box.</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <input value={addr} onChange={e => setAddr(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') find(); }} placeholder="Street address, city, state ZIP" autoComplete="street-address" style={{...inputStyle,flex:'1 1 280px',fontSize:12.5,padding:'7px 10px'}}/>
+            <Btn onClick={find} disabled={!addr.trim() || !!busy} style={{padding:'6px 14px',fontSize:12}}>{busy === 'find' ? 'Looking…' : 'Find my ballot'}</Btn>
+          </div>
+          <label style={{display:'flex',gap:6,alignItems:'center',marginTop:8,fontSize:12,color:C.textMid,cursor:'pointer'}}><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}/> Remember my address on this computer so the ballot can refresh itself</label>
+        </div>
+      )}
+      {err && <div style={{marginTop:8,fontSize:12,color:'#991b1b',lineHeight:1.5}}>{err}</div>}
+
+      {ballot && (
+        <div>
+          <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:6}}>
+            <div style={{flex:'1 1 220px',fontSize:13,fontWeight:800,color:C.text}}>Your ballot{ballot.election.name ? ' · ' + ballot.election.name : ''}</div>
+            {st.remembered && <button onClick={refresh} disabled={!!busy} style={link}>{busy === 'find' ? 'Refreshing…' : ballot.stale ? 'Refresh (out of date)' : 'Refresh'}</button>}
+            <button onClick={forget} disabled={!!busy} style={{...link,color:C.textMute,fontWeight:500}}>Forget my ballot{st.remembered ? ' and address' : ''}</button>
+          </div>
+          <div style={{...small,marginBottom:8}}>As of {new Date(ballot.fetchedAt).toLocaleString()}. {ballot.mailOnly ? 'Your area votes by mail. ' : ''}Ballot data can change: confirm with your board of elections.</div>
+
+          {measures.length > 0 && <div style={{fontSize:11,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.06em',margin:'8px 0 4px'}}>Ballot measures ({measures.length})</div>}
+          {measures.map(m => (
+            <div key={m.id} style={{padding:'9px 11px',margin:'6px 0',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 200px',minWidth:0,fontSize:13,fontWeight:800,color:C.text}}>{m.title}</div>
+                <span style={chip(C.surface,C.textMid,C.borderLight)}>{m.district || levelLabel[m.level]}</span>
+              </div>
+              {m.subtitle && <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.5,marginTop:2}}>{m.subtitle}</div>}
+              {notes[m.id] && (
+                <div style={{marginTop:6,padding:'7px 9px',background:C.accent + '10',border:`1px solid ${C.borderLight}`,borderRadius:6,fontSize:12.5,color:C.text,lineHeight:1.6,whiteSpace:'pre-line'}}>
+                  {notes[m.id].text}
+                  <div style={{...small,marginTop:4}}>Written by the local AI model from the official text below. It can be wrong and never says how to vote.</div>
+                </div>
+              )}
+              <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:6}}>
+                {m.text && !notes[m.id] && <button onClick={() => explain(m.id)} disabled={!!busy} style={link}>{busy === 'x' + m.id ? 'Explaining…' : 'Explain in plain language (AI)'}</button>}
+                {(m.text || m.pro || m.con) && <button onClick={() => setOpen(o => ({ ...o, [m.id]: !o[m.id] }))} style={link}>{open[m.id] ? 'Hide official text' : 'Show official text'}</button>}
+                {m.url && <a href={m.url} target="_blank" rel="noopener noreferrer" style={{...link,textDecoration:'none'}}>Official page ↗</a>}
+              </div>
+              {open[m.id] && (
+                <div style={{marginTop:6,fontSize:12.5,color:C.textMid,lineHeight:1.6,whiteSpace:'pre-line'}}>
+                  {m.text}
+                  {m.pro && <div style={{marginTop:6}}><strong>Statement for:</strong> {m.pro}</div>}
+                  {m.con && <div style={{marginTop:6}}><strong>Statement against:</strong> {m.con}</div>}
+                </div>
+              )}
+            </div>
+          ))}
+          {measures.length === 0 && <div style={{...small,margin:'6px 0'}}>No ballot measures are listed for your address{races.length ? '' : ' yet. Election offices often finish loading ballots a few weeks before the election.'}</div>}
+
+          {races.length > 0 && (
+            <div style={{marginTop:8}}>
+              <button onClick={() => setShowRaces(v => !v)} style={link}>{showRaces ? 'Hide' : 'Show'} {races.length} race{races.length === 1 ? '' : 's'} and candidates</button>
+              {showRaces && races.map(r => (
+                <div key={r.id} style={{padding:'6px 0',borderTop:`1px solid ${C.borderLight}`,marginTop:6}}>
+                  <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>{r.title} <span style={{...small,fontWeight:400}}>· {r.district || levelLabel[r.level]}{r.seats > 1 ? ` · vote for ${r.seats}` : ''}</span></div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:3}}>
+                    {r.candidates.map((k, i) => k.url
+                      ? <a key={i} href={k.url} target="_blank" rel="noopener noreferrer" style={{...chip(C.surface,C.text,C.borderLight),textDecoration:'none'}}>{k.name}{k.party ? ' (' + k.party + ')' : ''}</a>
+                      : <span key={i} style={chip(C.surface,C.text,C.borderLight)}>{k.name}{k.party ? ' (' + k.party + ')' : ''}</span>)}
+                    {r.candidates.length === 0 && <span style={small}>No candidates listed yet.</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(ballot.early.length > 0 || ballot.dropOff.length > 0 || ballot.polling.length > 0) && (
+            <div style={{marginTop:12}}>
+              <div style={{fontSize:11,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:2}}>Where to vote</div>
+              {ballot.polling.length > 0 && <div><div style={{...small,fontWeight:700,marginTop:4}}>Election Day polling place</div>{ballot.polling.map(site)}</div>}
+              {ballot.early.length > 0 && <div><div style={{...small,fontWeight:700,marginTop:6}}>Early voting ({ballot.early.length})</div>{ballot.early.slice(0, 6).map(site)}{ballot.early.length > 6 && <div style={small}>…and {ballot.early.length - 6} more on your election office's site.</div>}</div>}
+              {ballot.dropOff.length > 0 && <div><div style={{...small,fontWeight:700,marginTop:6}}>Ballot drop-off ({ballot.dropOff.length})</div>{ballot.dropOff.slice(0, 4).map(site)}</div>}
+            </div>
+          )}
+          {ballot.officials && (ballot.officials.infoUrl || ballot.officials.registrationUrl || ballot.officials.absenteeUrl || ballot.officials.finderUrl) && (
+            <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:10,paddingTop:8,borderTop:`1px solid ${C.borderLight}`}}>
+              {ballot.officials.name && <span style={{...small,fontWeight:700}}>{ballot.officials.name}:</span>}
+              {[['infoUrl', 'Election information'], ['registrationUrl', 'Register to vote'], ['checkUrl', 'Check your registration'], ['absenteeUrl', 'Vote by mail'], ['finderUrl', 'Find your polling place']].filter(([k]) => ballot.officials[k]).map(([k, l]) => <a key={k} href={ballot.officials[k]} target="_blank" rel="noopener noreferrer" style={{...link,textDecoration:'none'}}>{l} ↗</a>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function CivicNews({ civic, onStartStory, card, eyebrow }) {
@@ -7434,6 +7635,8 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
           <div style={eyebrow}>On the map</div>
           <CivicMap civic={civic} onSelect={onSelect} selKey={selKey}/>
         </div>
+
+        <CivicBallot civic={civic} card={card} eyebrow={eyebrow}/>
 
         <CivicNews civic={civic} onStartStory={onStartStory} card={card} eyebrow={eyebrow}/>
 

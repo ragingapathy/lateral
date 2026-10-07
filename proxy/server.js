@@ -156,13 +156,14 @@ function resolveLlmSecrets() {
     podcastIndexApiKey: String(file.podcastIndexApiKey || process.env.PODCAST_INDEX_API_KEY || '').trim(),
     podcastIndexApiSecret: String(file.podcastIndexApiSecret || process.env.PODCAST_INDEX_API_SECRET || '').trim(),
     tavilyApiKey: String(file.tavilyApiKey || TAVILY_API_KEY_ENV || '').trim(),
+    googleCivicApiKey: String(file.googleCivicApiKey || process.env.GOOGLE_CIVIC_API_KEY || '').trim(),
   };
 }
 
 function patchLlmSecrets(patch) {
   const current = readLlmSecretsFile();
   const next = { ...current };
-  const keys = ['anthropicApiKey', 'geminiApiKey', 'moonshotApiKey', 'moonshotBaseUrl', 'openaiCompatApiKey', 'openaiCompatBaseUrl', 'listenNotesApiKey', 'podcastIndexApiKey', 'podcastIndexApiSecret', 'tavilyApiKey'];
+  const keys = ['anthropicApiKey', 'geminiApiKey', 'moonshotApiKey', 'moonshotBaseUrl', 'openaiCompatApiKey', 'openaiCompatBaseUrl', 'listenNotesApiKey', 'podcastIndexApiKey', 'podcastIndexApiSecret', 'tavilyApiKey', 'googleCivicApiKey'];
   keys.forEach(k => {
     if (!(k in patch)) return;
     const val = String(patch[k] ?? '').trim();
@@ -705,6 +706,7 @@ async function handleLlmSecretsGet(res) {
     podcastIndexConfigured: !!sec.podcastIndexApiKey,
     podcastIndexSecretConfigured: !!sec.podcastIndexApiSecret,
     tavilyConfigured: !!sec.tavilyApiKey,
+    googleCivicConfigured: !!sec.googleCivicApiKey,
   });
 }
 
@@ -722,6 +724,7 @@ async function handleLlmSecretsPost(req, res) {
     podcastIndexApiKey: body.podcastIndexApiKey,
     podcastIndexApiSecret: body.podcastIndexApiSecret,
     tavilyApiKey: body.tavilyApiKey,
+    googleCivicApiKey: body.googleCivicApiKey,
   });
   return send(res, 200, {
     ok: true,
@@ -735,6 +738,7 @@ async function handleLlmSecretsPost(req, res) {
     podcastIndexConfigured: !!next.podcastIndexApiKey,
     podcastIndexSecretConfigured: !!next.podcastIndexApiSecret,
     tavilyConfigured: !!next.tavilyApiKey,
+    googleCivicConfigured: !!next.googleCivicApiKey,
   });
 }
 

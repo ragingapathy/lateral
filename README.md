@@ -103,7 +103,26 @@ state, your mayor, governor and school district), every group is judged against 
 stories use, the same story from several outlets is shown once, and anything removed can be restored. It refreshes every few
 hours, or press **Refresh**. Press **+ Track** on any article to start a story from it. Everyone who represents you is listed in
 the left-hand panel, so the center no longer repeats them. The page reads top to bottom: your districts, the map, local news, then
-the other local offices, boards and agendas, and what you are watching.
+the other local offices, boards and agendas, and what you are watching. Between the map and the news sits **Voting dates and your
+ballot** (below).
+
+### Voting dates and your ballot
+
+Two parts with different needs.
+
+- **Voting dates** come from the state in your profile, with no key and no street address: registration, early voting, mail-ballot
+  and Election Day dates, each marked passed or next. They are dated, sourced entries that were read from the state's election
+  office (`STATE_PLANS` in `proxy/civic-ballot.js`), because a wrong deadline is worse than none. **Only Ohio is filled in so far.** For
+  any other state the card shows the election date and links to that state's official site, and says so. Adding a state is one entry.
+- **Your ballot** comes from the [Google Civic Information API](https://developers.google.com/civic-information) (free key; create one
+  in Google Cloud and enable *Civic Information API*, then paste it in the card or set `GOOGLE_CIVIC_API_KEY`). You enter your
+  street address; Google returns the ballot measures and races for it, early-voting sites with dates and hours, drop boxes, your
+  polling place and your election office. The address goes to Google for that request and is **not kept** unless you tick *Remember my
+  address on this computer* (then it stays in `data/civic-ballot.json`, never in an export). Election offices load ballots a few weeks
+  before an election, so it can be empty earlier.
+- **Explain in plain language (AI)** asks the local model for a neutral three-line note on a measure (what it is, what yes and no
+  do) from its official text only. It is labeled, never recommends a vote, and the official text and for/against statements stay one
+  click away.
 
 ### Local media
 
@@ -307,6 +326,7 @@ as you use the app, and is **git-ignored** — only `.gitkeep` and `llm-secrets.
 | `podcast-worker.json` | Optional address and token of the transcription helper (**secret**). Environment variables win over this file. |
 | `archive/` | Saved copies of articles (one JSON file each, plus `index.json`). Not part of the Settings → Status export; copy this folder to back it up. |
 | `civic-track.json` | The bills you follow as predictions: which bill each prediction tracks, what would settle it, and the official actions seen so far. Not part of the Settings → Status export. |
+| `civic-ballot.json` | Your last ballot from Google Civic, any plain-language notes, and your address only if you chose to remember it. Not part of the Settings → Status export. |
 | `civic-media.json` | Local media for your place: what was read from Wikipedia (kept for a month), outlets you added, and ones you hid. Not part of the Settings → Status export. |
 | `civic-boards.json` | The boards you added under Boards and agendas (Legistar, Granicus or feed addresses), and suggestions you dismissed. Not part of the Settings → Status export. |
 | `civic-watch.json` | Which story each Civic watch feeds, your Federal Register topics, any optional Congress.gov / Open States keys (**secret**), and what has already been reported. Not part of the Settings → Status export. |
@@ -369,6 +389,7 @@ The proxy exposes a plain JSON API, so scripts and other tools can drive Lateral
 | `GET /api/lateral/civic/profile` · `POST /civic/lookup` `{"address": …}` · `/civic/refresh` · `/civic/legistar` `{"url": …}` · `/civic/remove` | Read the Civic profile; build one from a street address (the address is not stored); re-check officials without an address; point at (or confirm) the city's Legistar site; delete the profile. |
 | `GET /api/lateral/civic/watch/list` · `GET /civic/watch/items?kind=` | The watches available for your profile (`council`, `delegation`, `state`, `rules`), whether each is on, and key status; one watch's current items. |
 | `GET /api/lateral/civic/track/preview?item=` · `GET /civic/track/get?predictionId=` · `GET /civic/track/list` | What following a bill would create (targets, resolution date, starting confidence, latest actions); the official record behind a tracked prediction; all tracked predictions. `item` is a watch item id such as `bill:119-HR-1`, `os:ocd-bill/…` or `matter:44496`. |
+| `GET /api/lateral/civic/ballot/status` · `POST /civic/ballot/lookup` `{"address","remember"}` · `/ballot/refresh` · `/ballot/forget` · `/ballot/explain` `{"id"}` | Voting dates for your state and your ballot from Google Civic (needs `googleCivicApiKey`); forget drops the cached ballot and any remembered address; explain writes a neutral note for one measure. |
 | `GET /api/lateral/civic/media/list` · `POST /civic/media/refresh` · `/media/add` `{"name","url","kind"}` · `/media/remove` `{"id"}` · `/media/hide` · `/media/restore` `{"key"}` · `/media/search` | Local media: outlets grouped as `paper`, `tv`, `radio` and `online` with look-up links; read Wikipedia again; add, remove, hide or restore one; an opt-in web search for more (one Tavily credit, nothing saved). |
 | `GET /api/lateral/civic/boards/list` · `POST /civic/boards/suggest` · `/boards/preview` `{"input"}` · `/boards/add` · `/boards/remove` `{"id"}` · `/boards/dismiss` | Boards and agendas: your boards; look for a county Legistar site (probes only, nothing added); see what a pasted address would give (`kind` `legistar`, `granicus` or `feed`, with a few items, or the feeds found on a page); add one (`{"kind":"legistar","slug"}`, `{"kind":"granicus","host","viewId"}` or `{"kind":"feed","url"}`, with `scope` of `county`, `school`, `city` or `other`); remove or dismiss one. Each board is also a watch with kind `board:<id>`. |
 | `POST /api/lateral/civic/office/discover` · `/office/add` · `/office/remove` · `/office/restore` | Local offices beyond the council: search the web for a county or school office (`{"officeId":"sheriff"}`; one Tavily credit, nothing saved), save confirmed or hand-entered people (`{"officeId"|"office","people":[…]}`), remove one, or ask Wikidata for the mayor again. |
@@ -427,6 +448,10 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
   fallback card by design.
 
 ## What's new
+
+**v2.4 — Civic: voting dates and your ballot, and a clearer media menu.** A new Civic card shows your state's voting dates (Ohio so far) and, with a free Google
+Civic key and your address, the measures, races, early-voting sites and polling place on your ballot, with optional plain-language
+notes on each measure. The Local media menu now has a colour-coded block for each kind of source (government, papers, TV, news sites, radio).
 
 **v2.3.2 — Civic: local news and local media.** The Civic page now reads districts, map, **local news** (city and county government first, then
 state, schools and community), other local offices, boards and agendas, then watching, and no longer repeats the list of

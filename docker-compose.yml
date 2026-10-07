@@ -40,6 +40,7 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
       # Optional: you can set these here, or paste them into Settings in the app (Settings wins).
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - GOOGLE_CIVIC_API_KEY=${GOOGLE_CIVIC_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}

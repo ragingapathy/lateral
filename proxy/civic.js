@@ -568,6 +568,7 @@ async function lookup(rawAddress) {
     // Boards belong to a place: a different address starts without the old ones.
     try { require('./civic-boards').placeChanged(jurisdictions); } catch { /* boards are optional */ }
     try { require('./civic-media').placeChanged(jurisdictions); } catch { /* local media is optional */ }
+    try { require('./civic-ballot').placeChanged(jurisdictions); } catch { /* the ballot is optional */ }
     return db.profile;
   } finally { inFlight = null; }
 }
@@ -600,7 +601,7 @@ async function setLegistar(input) {
   return db.profile;
 }
 
-function remove() { db.profile = null; db.social = {}; db.offices = noOffices(); try { require('./civic-boards').clearAll(); } catch { /* boards are optional */ } try { require('./civic-media').clearAll(); } catch { /* local media is optional */ } save(); }
+function remove() { db.profile = null; db.social = {}; db.offices = noOffices(); try { require('./civic-boards').clearAll(); } catch { /* boards are optional */ } try { require('./civic-media').clearAll(); } catch { /* local media is optional */ } try { require('./civic-ballot').clearAll(); } catch { /* the ballot is optional */ } save(); }
 
 // ─── Local offices (see civic-offices.js) ────────────────────────────────────
 
@@ -1081,6 +1082,7 @@ async function route(req, reqUrl, res, send) {
   if (sub === 'track' || sub.startsWith('track/')) return require('./civic-track').route(req, reqUrl, res, send);
   if (sub === 'boards' || sub.startsWith('boards/')) return require('./civic-boards').route(req, reqUrl, res, send);
   if (sub === 'media' || sub.startsWith('media/')) return require('./civic-media').route(req, reqUrl, res, send);
+  if (sub === 'ballot' || sub.startsWith('ballot/')) return require('./civic-ballot').route(req, reqUrl, res, send);
   if (req.method === 'GET') {
     try {
       // A profile saved by an older version lacks newer details (such as social accounts): rebuild it from the stored district
