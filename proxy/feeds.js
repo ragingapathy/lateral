@@ -226,6 +226,25 @@ function activityEntries() {
   }));
 }
 
+// Prediction flips: the moments a prediction's evidence changed direction (the first evidence found counts too).
+// One entry per movement; `predictionId` limits it to one prediction and also includes smaller shifts.
+function flipEntries(predictionId) {
+  let events = [];
+  try { events = require('./alerts')._db().events; } catch { /* alerts unavailable */ }
+  const out = [];
+  for (const e of events) {
+    if (e.kind !== 'prediction-move' || (predictionId && e.predictionId !== predictionId)) continue;
+    const from = e.data && e.data.from, to = e.data && e.data.to;
+    const flip = !!(from && to && from.direction !== to.direction);
+    if (!flip && !predictionId) continue;
+    out.push({
+      id: `tag:lateral,2026:flip:${e.id}`, title: `${flip ? '⚑ ' : ''}${e.title}`, updated: e.at, link: storyLink(e.storyId) || appBase(),
+      category: flip ? 'flip' : 'move', html: htmlBody(e.body),
+    });
+  }
+  return out;
+}
+
 function storyEntries(story, cacheJson) {
   const out = [];
   const sc = ((cacheJson.storyCache || {})[story.id]) || {};
@@ -284,6 +303,7 @@ function opml(base, stories) {
     <outline text="Lateral" title="Lateral">
 ${row('Lateral: activity', 'activity.xml')}
 ${row('Lateral: all stories', 'stories.xml')}
+${row('Lateral: prediction flips', 'flips.xml')}
 ${stories.map(s => row(`Lateral: ${s.title.replace(' (Prediction)', '')}`, `story/${s.id}.xml`)).join('\n')}
     </outline>
   </body>
@@ -320,6 +340,14 @@ async function route(req, reqUrl, res, send) {
     if (what === 'stories.xml') {
       const entries = newestFirst(stories.flatMap(s => s.predictionId ? predictionEntries(s) : storyEntries(s, cacheJson))).slice(0, 150);
       return sendXml(res, 'application/atom+xml', atom({ title: 'Lateral: all stories', id: 'tag:lateral,2026:stories', subtitle: 'New coverage and episodes across the stories you track', link: appBase(), entries }));
+    }
+    if (what === 'flips.xml') return sendXml(res, 'application/atom+xml', atom({ title: 'Lateral: prediction flips', id: 'tag:lateral,2026:flips', subtitle: "Each time a prediction's evidence changed direction", link: appBase(), entries: newestFirst(flipEntries()).slice(0, 100) }));
+    const pm = what.match(/^prediction\/([^/]+)\.xml$/);
+    if (pm) {
+      const pid = decodeURIComponent(pm[1]);
+      const ps = stories.find(x => x.predictionId === pid);
+      if (!ps) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('No such prediction'); }
+      return sendXml(res, 'application/atom+xml', atom({ title: `Lateral flips: ${ps.title.replace(' (Prediction)', '')}`, id: `tag:lateral,2026:flips:${pid}`, subtitle: "Every time this prediction's evidence moved; ⚑ marks a change of direction", link: storyLink(ps.id) || appBase(), entries: newestFirst(flipEntries(pid)).slice(0, 100) }));
     }
     const sm = what.match(/^story\/([^/]+)\.xml$/);
     if (sm) {

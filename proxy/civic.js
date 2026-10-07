@@ -267,6 +267,8 @@ async function congressRoster() {
   return roster;
 }
 
+// A plain YYYY-MM-DD date (the shape every source here uses for term dates).
+const validDay = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !Number.isNaN(Date.parse(s));
 function electionYearOf(termEnd) { const y = Number(String(termEnd || '').slice(0, 4)); return y ? y - 1 : null; }
 
 function federalOfficials(roster, stateAbbr, district, now = new Date(), socialMap = {}) {
@@ -282,7 +284,7 @@ function federalOfficials(roster, stateAbbr, district, now = new Date(), socialM
       office: isSen ? 'U.S. Senator' : (stateAbbr === 'DC' || t.type === 'del' ? 'U.S. Delegate' : 'U.S. Representative'),
       level: 'federal', district: isSen ? null : Number(t.district), party: t.party || '',
       phone: t.phone || '', website: t.url || '', contactForm: t.contact_form || '', address: t.address || '',
-      bioguide: m.id && m.id.bioguide, wikipedia: (m.id && m.id.wikipedia) || '', socialData: datasetSocial(socialMap[m.id && m.id.bioguide]), termEnds: t.end || '', nextElection: ey,
+      bioguide: m.id && m.id.bioguide, wikipedia: (m.id && m.id.wikipedia) || '', socialData: datasetSocial(socialMap[m.id && m.id.bioguide]), termStart: validDay(t.start) ? t.start : '', termEnds: t.end || '', nextElection: ey,
       upForElection: ey === thisYear, sourceUrl: 'https://github.com/unitedstates/congress-legislators', asOf,
     });
   }
@@ -349,7 +351,7 @@ function personRecord(y, now = today()) {
     party: (Array.isArray(y.party) && y.party[0] && y.party[0].name) || '',
     email: y.email || '', phone: off.voice || '', address: off.address || '',
     website: (links[0] && links[0].url) || '', image: y.image || '',
-    roles: roles.map(r => ({ type: r.type, district: String(r.district == null ? '' : r.district), start: r.start_date || '' })),
+    roles: roles.map(r => ({ type: r.type, district: String(r.district == null ? '' : r.district), start: r.start_date || '', end: r.end_date || '' })),
   };
 }
 
@@ -392,6 +394,8 @@ function stateOfficials(index, stateAbbr, upperDistrict, lowerDistrict, now = ne
     name: p.name, office: dc && role.type === 'upper' ? `D.C. Councilmember, Ward ${role.district}` : office,
     level: dc ? 'local' : 'state', district: role.district, party: p.party, email: p.email, phone: p.phone, socialData: p.social || {}, osId: p.id ? `ocd-person/${p.id}` : '',
     website: p.website, address: p.address, image: p.image,
+    // Open States dates the role, not the term: "since" is when this seat's current role began, and an end date appears only when listed.
+    ...(validDay(role.start) ? { termStart: role.start } : {}), ...(validDay(role.end) && role.end > (role.start || '') ? { termEnds: role.end } : {}),
     sourceUrl: `https://github.com/openstates/people/tree/main/data/${stateAbbr.toLowerCase()}`, asOf,
   });
   for (const p of (index && index.legislature) || []) {
@@ -445,11 +449,16 @@ async function legistarDiscover(candidates) {
 
 const PRIMARY_BODY = /(city|town|village|borough|county|metro|municipal)?\s*(council|board of supervisors|commissioners|board of aldermen|aldermen|board of legislators|legislature|assembly)\b/i;
 
-async function legistarOfficials(slug, bodies, now = new Date()) {
+// Legistar writes dates like 2029-08-25T00:00:00; keep the day.
+const termDay = v => { const d = String(v || '').slice(0, 10); return validDay(d) ? d : ''; };
+const SCHOOL_BODY = /\b(board of education|school board|board of school (directors|trustees)|board of trustees|school committee)\b/i;
+
+// `bodyPattern` picks the body to list when it is not the main council: a school board's own Legistar site, say.
+async function legistarOfficials(slug, bodies, now = new Date(), bodyPattern = null) {
   bodies = bodies || await legistarProbe(slug);
   if (!bodies) throw new Error('Legistar site not reachable');
   // The main legislative body: Legistar marks it, otherwise match on the name.
-  const primary = bodies.filter(b => b.BodyActiveFlag !== 0 && (/primary legislative/i.test(b.BodyTypeName || '') || PRIMARY_BODY.test(b.BodyName || '')));
+  const primary = bodies.filter(b => b.BodyActiveFlag !== 0 && (bodyPattern ? bodyPattern.test(b.BodyName || '') : (/primary legislative/i.test(b.BodyTypeName || '') || PRIMARY_BODY.test(b.BodyName || ''))));
   const main = primary.find(b => /primary legislative/i.test(b.BodyTypeName || '')) || primary[0];
   if (!main) return { body: null, officials: [], bodies: bodies.length };
   let all = [], skip = 0;
@@ -468,6 +477,8 @@ async function legistarOfficials(slug, bodies, now = new Date()) {
     officials.push({
       name: r.OfficeRecordFullName || '', office: r.OfficeRecordTitle || `${main.BodyName} member`, level: 'local',
       body: main.BodyName, email: r.OfficeRecordEmail || '', phone: r.OfficeRecordPhone || '',
+      ...(termDay(r.OfficeRecordStartDate) ? { termStart: termDay(r.OfficeRecordStartDate) } : {}),
+      ...(termDay(r.OfficeRecordEndDate) && termDay(r.OfficeRecordEndDate) > termDay(r.OfficeRecordStartDate) ? { termEnds: termDay(r.OfficeRecordEndDate) } : {}),
       sourceUrl: `https://${slug}.legistar.com/`, asOf,
     });
   }
@@ -554,6 +565,8 @@ async function lookup(rawAddress) {
     // The coordinates and the street address end here: they are not part of the profile.
     db.profile = assemble(label, jurisdictions, officials, local, sources);
     save();
+    // Boards belong to a place: a different address starts without the old ones.
+    try { require('./civic-boards').placeChanged(jurisdictions); } catch { /* boards are optional */ }
     return db.profile;
   } finally { inFlight = null; }
 }
@@ -566,6 +579,7 @@ async function refresh() {
   await mayor;
   db.profile = { ...assemble(p.label, p.jurisdictions, officials, local, sources), stories: p.stories || [] };
   save();
+  try { await require('./civic-boards').refreshOfficials(); } catch { /* boards are optional */ }
   return db.profile;
 }
 
@@ -585,12 +599,12 @@ async function setLegistar(input) {
   return db.profile;
 }
 
-function remove() { db.profile = null; db.social = {}; db.offices = noOffices(); save(); }
+function remove() { db.profile = null; db.social = {}; db.offices = noOffices(); try { require('./civic-boards').clearAll(); } catch { /* boards are optional */ } save(); }
 
 // ─── Local offices (see civic-offices.js) ────────────────────────────────────
 
 const offices = () => require('./civic-offices');
-const OFFICE_SOURCES = new Set(['wikidata', 'search', 'manual']);
+const OFFICE_SOURCES = new Set(['wikidata', 'search', 'manual', 'board']);
 
 // The mayor comes from Wikidata with no account and no cost. A mayor the person removed, or entered by hand, is left alone.
 async function autoMayor(p, sources) {
@@ -613,6 +627,20 @@ function officesView(p) {
     })),
     presets: offices().PRESET_OFFICES,
   };
+}
+
+// Officials read from a board's own site (see civic-boards.js) replace that board's earlier entries. A person you removed stays removed.
+function setBoardOfficials(boardId, entries) {
+  if (!db.profile) return;
+  const gone = new Set(db.offices.dismissedKeys || []);
+  db.offices.entries = db.offices.entries.filter(e => e.boardId !== boardId)
+    .concat((entries || []).map(e => ({ ...e, boardId, source: 'board', level: 'local', asOf: today() })).filter(e => !gone.has(okey(e))));
+  syncOffices();
+}
+function dropBoardOfficials(boardId) {
+  if (!db.profile) return;
+  db.offices.entries = db.offices.entries.filter(e => e.boardId !== boardId);
+  syncOffices();
 }
 
 function syncOffices() {
@@ -659,6 +687,7 @@ function removeOffice(key) {
   db.offices.entries = db.offices.entries.filter(x => x !== e);
   // an automatic entry must not come back with the next refresh
   if (e.source === 'wikidata' && e.officeId && !db.offices.dismissed.includes(e.officeId)) db.offices.dismissed.push(e.officeId);
+  if (e.source === 'board') { db.offices.dismissedKeys = (db.offices.dismissedKeys || []).concat(okey(e)).slice(-200); }
   delete db.social[key];
   syncOffices();
   return decorate(db.profile);
@@ -1049,6 +1078,7 @@ async function route(req, reqUrl, res, send) {
   const sub = p.slice('/civic/'.length);
   if (sub === 'watch' || sub.startsWith('watch/')) return require('./civic-watch').route(req, reqUrl, res, send);
   if (sub === 'track' || sub.startsWith('track/')) return require('./civic-track').route(req, reqUrl, res, send);
+  if (sub === 'boards' || sub.startsWith('boards/')) return require('./civic-boards').route(req, reqUrl, res, send);
   if (req.method === 'GET') {
     try {
       // A profile saved by an older version lacks newer details (such as social accounts): rebuild it from the stored district
@@ -1086,11 +1116,11 @@ async function route(req, reqUrl, res, send) {
 }
 
 module.exports = {
-  route, lookup, refresh, setLegistar, remove, profile: () => decorate(db.profile), getJson, get,
+  route, lookup, refresh, setLegistar, remove, profile: () => decorate(db.profile), getJson, get, setBoardOfficials, dropBoardOfficials,
   init: c => { ctx = { ...ctx, ...(c || {}) }; },
   // exported for tests
   parseYaml, personRecord, stateOfficials, federalOfficials, legistarCandidates, legistarSlugFromUrl, normalizeAddress,
-  congressNumber, ord, sameDistrict, legistarOfficials, cleanPlace, slugify, electionYearOf,
+  congressNumber, ord, sameDistrict, legistarOfficials, legistarProbe, SCHOOL_BODY, cleanPlace, slugify, electionYearOf, validDay,
   socialFromUrl, normalizeHandle, socialUrl, datasetSocial, accountsOf, setSocial, removeSocial, discoverSocial, okey,
   areaOf, outlinesDiffer, wikiMatches, safeHttpsUrl, aboutFor, photoFor, addOffices, removeOffice, restoreOffice, discoverOffice, officesView, autoMayor, _setProfileForTest: p => { db.profile = p; db.social = {}; db.offices = noOffices(); },
 };

@@ -34,6 +34,12 @@ function catalogFor(profile) {
     { id: 'county-board', office: 'County Commissioner', title: 'County commissioners or executive', available: !!county, via: 'search', body: county ? `${county} government` : '', multi: true,
       question: `Who are the current members of the board of county commissioners (or the county executive and county council) of ${where}?`,
       hint: 'Search the web for the people who run the county.' },
+    { id: 'city-manager', office: 'City Manager', title: 'City manager or administrator', available: !!place, via: 'search', body: place ? `City of ${place}` : '', multi: false,
+      question: `Who is the current city manager (or city administrator) of ${place}, ${st}?`,
+      hint: 'For cities run by an appointed manager rather than (or alongside) a mayor.' },
+    { id: 'county-officers', office: 'County Officer', officeFromRole: true, title: 'Other county officers', available: !!county, via: 'search', body: county ? `${county} government` : '', multi: true,
+      question: `Who currently holds the county offices of ${where}: auditor, treasurer, clerk of courts or county clerk, recorder, prosecuting attorney, coroner and engineer? Give each person's office.`,
+      hint: 'The auditor, treasurer, clerk, recorder, prosecutor, coroner and engineer. Each person keeps the office the source gives.' },
     { id: 'county-judges', office: 'County Judge', title: 'County judges', available: !!county, via: 'search', body: county ? `${county} courts` : '', multi: true,
       question: `Who are the current judges of the court of common pleas, county court or other county courts of ${where}?`,
       hint: 'Judges of the county courts (some states call the county executive a county judge, and that is fine too).' },
@@ -195,7 +201,8 @@ const PRESET_OFFICES = ['Mayor', 'County Commissioner', 'County Executive', 'Cou
 // A validated entry from user or search input. Throws a plain-language message.
 function cleanEntry(input, catalog) {
   const cat = (catalog || []).find(c => c.id === input.officeId) || null;
-  const office = clip(input.office || (cat && cat.office), 60);
+  // A catalogue entry that spans several offices (other county officers) takes each person's own office from what the source said.
+  const office = clip((cat && cat.officeFromRole && clip(input.role, 60)) || input.office || (cat && cat.office), 60);
   const name = clip(input.name, 80);
   if (!office) throw new Error('Choose or type the office.');
   if (!name || name.length < 3 || !/[A-Za-z]/.test(name)) throw new Error('Enter the person\'s name.');
@@ -207,7 +214,7 @@ function cleanEntry(input, catalog) {
   const srcUrl = /^https?:\/\/\S+$/i.test(clean(input.sourceUrl)) ? clean(input.sourceUrl) : '';
   return {
     officeId: cat ? cat.id : '', office, level: 'local', name, body: clip(input.body || (cat && cat.body), 100),
-    ...(clip(input.role, 60) ? { role: clip(input.role, 60) } : {}),
+    ...(clip(input.role, 60) && !(cat && cat.officeFromRole) ? { role: clip(input.role, 60) } : {}),
     ...(email ? { email } : {}), ...(phone ? { phone } : {}), ...(site ? { website: site } : {}),
     source: src, sourceUrl: srcUrl,
     sourceNote: src === 'search' ? 'Found by a web search and confirmed by you.' : 'Added by you.',

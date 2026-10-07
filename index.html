@@ -1716,6 +1716,81 @@ async function searchArticles(q) {
   throw new Error(`Search failed: ${lastStatus || lastErr?.message || 'network'}`);
 }
 
+// ── Same-story grouping for headline lists ───────────────────────────────────
+// One announcement carried by five outlets is one story: the first article stays, the rest tuck under it as "Also covered by".
+// The server answers from cached same-story verdicts and judges new pairs in the background, so a list can regroup a few
+// seconds after it first appears. Nothing is hidden for good: every repeat is one click away.
+const _groupMemo = new Map();   // list signature -> groups, so re-renders and re-opened sections don't flash
+function collapseGroups(list, groups) {
+  if (!groups || !groups.length) return { lead: list, also: () => null, hidden: 0 };
+  const byUrl = new Map();
+  groups.forEach(g => g.members.forEach(u => byUrl.set(u, g)));
+  const seen = new Set(), lead = [], alsoMap = new Map();
+  for (const a of list) {
+    const g = byUrl.get(a.url);
+    if (!g) { lead.push(a); continue; }
+    if (seen.has(g.gid)) continue;
+    seen.add(g.gid);
+    lead.push(a);
+    alsoMap.set(a.url, list.filter(x => x !== a && byUrl.get(x.url) === g));
+  }
+  return { lead, also: u => alsoMap.get(u) || null, hidden: list.length - lead.length };
+}
+function useArticleGroups(articles) {
+  const list = Array.isArray(articles) ? articles.filter(a => a && a.url) : [];
+  const sig = list.map(a => a.url).join('\n');
+  const [groups, setGroups] = useState(() => _groupMemo.get(sig) || null);
+  useEffect(() => {
+    if (list.length < 2) { setGroups(null); return; }
+    setGroups(_groupMemo.get(sig) || null);
+    let dead = false, timer = null, tries = 0;
+    const run = async () => {
+      try {
+        const r = await fetch('/api/lateral/dedupe/headlines', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ articles: list.slice(0, 80).map(a => ({ url: a.url, title: a.title, source: a.source?.name || a.source?.domain || '', text: String(a.snippet || a.summary || '').slice(0, 200) })) }) });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (dead) return;
+        const g = Array.isArray(j.groups) ? j.groups : [];
+        _groupMemo.set(sig, g);
+        if (_groupMemo.size > 200) _groupMemo.delete(_groupMemo.keys().next().value);
+        setGroups(g);
+        if (j.pending && tries++ < 15) timer = setTimeout(run, 5000);
+      } catch {}
+    };
+    const t0 = setTimeout(run, 400);
+    return () => { dead = true; clearTimeout(t0); clearTimeout(timer); };
+  }, [sig]);
+  return React.useMemo(() => collapseGroups(list, groups), [sig, groups]);
+}
+function AlsoCovered({ also }) {
+  const [open, setOpen] = useState(false);
+  if (!also || !also.length) return null;
+  const nameOf = a => a.source?.name || a.source?.domain || 'Another outlet';
+  const names = [...new Set(also.map(nameOf))];
+  return (
+    <div onClick={e => e.stopPropagation()} style={{fontSize:10, lineHeight:1.4}}>
+      <button onClick={() => setOpen(o => !o)} title="Other articles reporting the same story"
+        style={{background:'none', border:'none', padding:0, cursor:'pointer', color:C.accent, fontWeight:700, fontSize:10, textAlign:'left'}}>
+        {open ? '▾' : '▸'} Also covered by {also.length} {also.length === 1 ? 'outlet' : 'outlets'}{!open && names.length ? ` (${names.slice(0, 2).join(', ')}${names.length > 2 ? '…' : ''})` : ''}
+      </button>
+      {open && (
+        <div style={{marginTop:4, display:'flex', flexDirection:'column', gap:4}}>
+          {also.map((a, i) => (
+            <a key={a.url || i} href={articleOpenUrl(a) || a.url} target="_blank" rel="noopener noreferrer"
+              style={{color:C.textMid, textDecoration:'none'}}><strong style={{color:C.text}}>{nameOf(a)}</strong> — {a.title}</a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+// Drop-in for `articles.map(a => <ArticleCard …/>)`: renders the lead article of each story, handing its repeats to the card.
+function GroupedCards({ articles, render }) {
+  const g = useArticleGroups(articles);
+  return <>{g.lead.map((a, i) => render(a, g.also(a.url), i))}</>;
+}
+
 // ── AI relevance gate ─────────────────────────────────────────────────────────
 // Search matches keywords, so off-topic articles slip in ("military duty" in a football story under Military AI).
 // After a list is assembled, the server's judge reads each article against the topic it was filed under. Off-topic
@@ -1828,6 +1903,40 @@ async function fetchVideos(q) {
   const data = await r.json();
   return data.videos || [];
 }
+// ── Podcast intelligence (episode ranking, local transcripts, key moments; see proxy/podcasts.js) ──
+async function podPost(path, body) {
+  const r = await fetch('/api/lateral/podcast/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+async function podGet(path) {
+  const r = await fetch('/api/lateral/podcast/' + path);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+const POD_SCORE = {
+  3: { label: 'Strong match',     fg: '#047857', bg: '#d1fae5' },
+  2: { label: 'Related',          fg: '#1d4ed8', bg: '#dbeafe' },
+  1: { label: 'Loose link',       fg: '#6b6761', bg: '#ece9e3' },
+  0: { label: 'Likely off-topic', fg: '#b91c1c', bg: '#fee2e2' },
+};
+function podClock(sec) {
+  sec = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(x).padStart(2, '0');
+}
+// Asks the server's judge to score and order episodes for this story. Fails open: on any problem the list is returned as it was.
+async function rankPodcastItems(story, list) {
+  try {
+    const out = await podPost('rank', { storyId: story.id, ...storyRelevanceCtx(story),
+      episodes: list.map(p => ({ title: p.title, podcastTitle: p.podcastTitle, summary: p.summary, audioUrl: p.audioUrl, url: p.url })) });
+    if (!out.items?.length) return { list, ai: out.ai || 'unavailable' };
+    return { list: out.items.map(it => ({ ...list[it.i], _key: it.key, _score: it.score, _why: it.why, _hidden: !!it.hidden })), ai: out.ai };
+  } catch { return { list, ai: 'unavailable' }; }
+}
+
 async function fetchPodcasts(q, limit = 16) {
   try {
     const r = await fetch(`/api/lateral/podcasts?q=${encodeURIComponent(q)}&limit=${encodeURIComponent(limit)}`);
@@ -4030,6 +4139,8 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
   const [activeVid,  setActiveVid]  = useState(null);
   const [tick,       setTick]       = useState(0);
   const [expanded,   setExpanded]   = useState(false);
+  const [openGroups, setOpenGroups] = useState({});   // lead url -> showing its repeats
+  const grp = useArticleGroups(items);
   const [cachedAt,   setCachedAt]   = useState(null);
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [addedIdx,   setAddedIdx]   = useState(null); // briefly shows ✓ after adding
@@ -4285,7 +4396,7 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
     </>
   );
 
-  const displayed = expanded ? items : items.slice(0, 5);
+  const displayed = expanded ? grp.lead : grp.lead.slice(0, 5);
 
   return (
     <div style={{borderTop:`1px solid ${C.borderLight}`,flexShrink:0,background:C.surface}}>
@@ -4293,7 +4404,7 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
       <div style={{padding:'10px 24px 8px',display:'flex',alignItems:'center',gap:8,borderBottom:`1px solid ${C.borderLight}`}}>
         <div style={HL}>Latest Headlines</div>
         <span style={{fontSize:10,color:C.textMute}}>·</span>
-        <span style={{fontSize:10,color:C.textMute}}>{items.length} results</span>
+        <span style={{fontSize:10,color:C.textMute}}>{grp.lead.length} results{grp.hidden > 0 ? ` · ${grp.hidden} repeat${grp.hidden !== 1 ? 's' : ''} grouped` : ''}</span>
         {cacheLabel && <span style={{fontSize:9.5,color:C.textMute,fontStyle:'italic'}}>· {cacheLabel}</span>}
         <button onClick={recheckItems} disabled={rechecking} title="Have the AI re-read these headlines and move any that don't belong to the Filtered out list"
           style={{marginLeft:'auto',fontSize:11,color:C.textMute,background:'none',border:'none',cursor:rechecking?'default':'pointer',fontWeight:700,padding:0}}>{rechecking ? 'checking…' : '✓ Check relevance'}</button>
@@ -4320,8 +4431,11 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
         const isNew = !!(prevViewedAt && a.firstSeenAt && new Date(a.firstSeenAt) > new Date(prevViewedAt));
         const billItem = civicItemOf(a);   // a bill or ordinance from a Civic watch can be followed as a prediction
         const actW = billItem ? 250 : 176;
+        const also = grp.also(a.url) || [];
+        const alsoOpen = also.length > 0 && !!openGroups[a.url];
         return (
-          <div key={a.url||i}
+          <React.Fragment key={a.url||i}>
+          <div
             onMouseEnter={() => setHoveredIdx(i)}
             onMouseLeave={() => setHoveredIdx(null)}
             style={{display:'flex',alignItems:'center',gap:10,padding:'8px 24px',borderBottom:`1px solid ${C.borderLight}`,background:isHover?C.bg:'transparent',transition:'background 0.1s',minHeight:56}}>
@@ -4333,6 +4447,13 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
               style={{flex:1,minWidth:0,fontSize:12.5,color:C.text,lineHeight:1.4,fontWeight:500,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',textDecoration:'none'}}>
               {title}
             </a>
+            {also.length > 0 && (
+              <button onClick={() => setOpenGroups(o => ({ ...o, [a.url]: !o[a.url] }))}
+                title={`Also reported by ${[...new Set(also.map(x => x.source?.name || x.source?.domain || 'another outlet'))].join(', ')}`}
+                style={{flexShrink:0,fontSize:10,fontWeight:700,color:C.accent,background:'none',border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'1px 7px',cursor:'pointer',whiteSpace:'nowrap'}}>
+                {alsoOpen ? '▾' : '▸'} +{also.length} {also.length === 1 ? 'outlet' : 'outlets'}
+              </button>
+            )}
             <div style={{flex:`0 0 ${actW}px`,display:'flex',alignItems:'center',gap:5,justifyContent:'flex-end',width:actW}}>
               {isHover ? (
                 <div style={{display:'flex',gap:5,width:'100%',justifyContent:'flex-end'}}>
@@ -4370,13 +4491,22 @@ function HeadlinesFeed({ story, settings, onAddFromHeadline, onStoryRefreshed, o
               )}
             </div>
           </div>
+          {alsoOpen && also.map((x, k) => (
+            <a key={x.url || k} href={x.url} target="_blank" rel="noopener noreferrer"
+              style={{display:'flex',alignItems:'baseline',gap:8,padding:'5px 24px 5px 46px',borderBottom:`1px solid ${C.borderLight}`,background:C.bg,textDecoration:'none',fontSize:11.5,color:C.textMid,lineHeight:1.4}}>
+              <span style={{flexShrink:0,fontWeight:700,color:C.text,maxWidth:130,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{x.source?.name || x.source?.domain || 'Another outlet'}</span>
+              <span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{(() => { const d = x.title.lastIndexOf(' - '); return d > 20 ? x.title.slice(0, d).trim() : x.title; })()}</span>
+              {x.date && <span style={{flexShrink:0,fontSize:9.5,color:C.textMute}}>{fmtD(x.date)}</span>}
+            </a>
+          ))}
+          </React.Fragment>
         );
       })}
       {/* Expand / collapse */}
-      {items.length > 5 && (
+      {grp.lead.length > 5 && (
         <button onClick={()=>setExpanded(e=>!e)}
           style={{width:'100%',padding:'7px 24px',textAlign:'left',fontSize:11,fontWeight:700,color:C.accent,background:'none',border:'none',borderTop:`1px solid ${C.borderLight}`,cursor:'pointer'}}>
-          {expanded ? '↑ Show less' : `↓ ${items.length - 5} more headlines`}
+          {expanded ? '↑ Show less' : `↓ ${grp.lead.length - 5} more headlines`}
         </button>
       )}
 
@@ -4541,6 +4671,164 @@ function broadenPodcastTerms(story) {
   return terms.slice(0, 3);
 }
 
+// Key moments + transcript for one transcribed episode. The audio is never cut: moments are timestamps you play from.
+function PodcastMoments({ ep, tkey, story, onClose }) {
+  const [tab, setTab] = useState('moments');
+  const [doc, setDoc] = useState(null);
+  const [docErr, setDocErr] = useState('');
+  const [sec, setSec] = useState({ state: 'loading' });
+  const [q, setQ] = useState('');
+  const [cur, setCur] = useState(0);
+  const [openIdx, setOpenIdx] = useState({});
+  const [copied, setCopied] = useState(null);
+  const audioRef = React.useRef(null);
+  const alive = React.useRef(true);
+  const rctx = storyRelevanceCtx(story);
+  const topicQ = encodeURIComponent(rctx.topic);
+
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose && onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => {
+    podGet('transcript?key=' + tkey).then(d => { if (alive.current) setDoc(d); }).catch(e => { if (alive.current) setDocErr(e.message); });
+  }, [tkey]);
+
+  async function loadSections(force) {
+    setSec({ state: 'running', done: 0, total: 0 });
+    try {
+      let r = await podPost('sections', { key: tkey, ...rctx, force: !!force });
+      while (alive.current && r.state === 'running') {
+        setSec(r);
+        await new Promise(res => setTimeout(res, 2000));
+        r = await podGet(`sections?key=${tkey}&topic=${topicQ}`);
+      }
+      if (alive.current) setSec(r);
+    } catch (e) { if (alive.current) setSec({ state: 'error', error: e.message }); }
+  }
+  useEffect(() => { loadSections(false); }, [tkey]);
+
+  function seek(t) {
+    const a = audioRef.current;
+    if (!a) return;
+    const go = () => { try { a.currentTime = Math.max(0, t - 1); a.play().catch(() => {}); } catch {} };
+    if (a.readyState >= 1) go(); else { a.addEventListener('loadedmetadata', go, { once: true }); a.load(); }
+  }
+  function copyQuote(text, start, id) {
+    const line = `"${text}" — ${ep.podcastTitle ? ep.podcastTitle + ', ' : ''}"${ep.title}" at ${podClock(start)}`;
+    try { navigator.clipboard.writeText(line); setCopied(id); setTimeout(() => setCopied(c => c === id ? null : c), 1500); } catch {}
+  }
+
+  const btn = { fontSize:11, fontWeight:700, color:C.textMid, background:'none', border:`1px solid ${C.border}`, borderRadius:6, padding:'3px 9px', cursor:'pointer' };
+  const tabBtn = on => ({ fontSize:12, fontWeight:700, color: on ? C.accent : C.textMute, background:'none', border:'none', borderBottom: `2px solid ${on ? C.accent : 'transparent'}`, padding:'7px 2px', marginRight:16, cursor:'pointer' });
+  const needle = q.trim().toLowerCase();
+  const segs = (doc?.segments || []).filter(g => !needle || g.t.toLowerCase().includes(needle));
+  const mark = t => {
+    if (!needle) return t;
+    const i = t.toLowerCase().indexOf(needle);
+    return i < 0 ? t : <>{t.slice(0, i)}<mark style={{background:'#fde68a',color:'inherit',borderRadius:2}}>{t.slice(i, i + needle.length)}</mark>{t.slice(i + needle.length)}</>;
+  };
+
+  return (
+    <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', zIndex:2100, display:'flex', alignItems:'center', justifyContent:'center', padding:16}} onClick={onClose}>
+      <div role="dialog" aria-label="Key moments" style={{width:'min(860px, 100%)', maxHeight:'90vh', background:C.surface, border:`1px solid ${C.border}`, borderRadius:12, display:'flex', flexDirection:'column', overflow:'hidden'}} onClick={e => e.stopPropagation()}>
+        <div style={{padding:'12px 16px 8px', borderBottom:`1px solid ${C.borderLight}`}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10}}>
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:13.5, fontWeight:800, color:C.text, lineHeight:1.3}}>{ep.title}</div>
+              <div style={{fontSize:11, color:C.textMute, marginTop:2}}>{ep.podcastTitle}{doc ? ` · ${podClock(doc.duration)} · transcribed locally (${doc.model})` : ''}</div>
+            </div>
+            <button onClick={onClose} aria-label="Close" style={{border:'none', background:'none', fontSize:22, color:C.textMute, cursor:'pointer', lineHeight:1}}>×</button>
+          </div>
+          <audio ref={audioRef} controls preload="metadata" src={ep.audioUrl} style={{width:'100%', marginTop:8, height:36}}
+            onTimeUpdate={e => setCur(e.currentTarget.currentTime)}/>
+          <div style={{display:'flex', marginTop:6}}>
+            <button style={tabBtn(tab === 'moments')} onClick={() => setTab('moments')}>Key moments{sec.state === 'done' ? ` (${sec.sections.length})` : ''}</button>
+            <button style={tabBtn(tab === 'transcript')} onClick={() => setTab('transcript')}>Full transcript</button>
+          </div>
+        </div>
+
+        <div style={{overflowY:'auto', padding:'12px 16px 16px', flex:1}}>
+          {docErr && <div style={{fontSize:12, color:'#b91c1c'}}>{docErr}</div>}
+
+          {tab === 'moments' && (
+            <>
+              {(sec.state === 'loading' || sec.state === 'running') && (
+                <div style={{fontSize:12, color:C.textMute, display:'flex', alignItems:'center', gap:8}}>
+                  <span style={{width:8, height:8, borderRadius:'50%', background:C.accent, animation:'chatPulse 1.2s ease-in-out infinite'}}/>
+                  Reading the transcript for “{rctx.topic}”… {sec.total ? `${sec.done}/${sec.total} passages` : ''}
+                </div>
+              )}
+              {sec.state === 'error' && (
+                <div style={{fontSize:12, color:'#b91c1c'}}>{sec.error || 'Could not find key moments.'} <button style={btn} onClick={() => loadSections(true)}>Retry</button></div>
+              )}
+              {sec.state === 'done' && (
+                <>
+                  <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:10}}>
+                    <span style={{fontSize:11.5, color:C.textMute}}>
+                      {sec.sections.length
+                        ? `${sec.sections.length} key moment${sec.sections.length !== 1 ? 's' : ''} in this ${sec.minutes}-minute episode, in the order they occur.`
+                        : `Nothing in this episode clearly covers “${rctx.topic}”.`}
+                    </span>
+                    <button style={{...btn, marginLeft:'auto'}} onClick={() => loadSections(true)} title="Run the scan again">↻ Re-scan</button>
+                  </div>
+                  <div style={{display:'flex', flexDirection:'column', gap:10}}>
+                    {sec.sections.map((m, i) => {
+                      const sc = POD_SCORE[m.score] || POD_SCORE[1];
+                      const long = m.text.length > 460;
+                      const open = !!openIdx[i];
+                      const playing = cur >= m.start && cur < m.end;
+                      return (
+                        <div key={i} style={{border:`1px solid ${playing ? C.accent : C.border}`, borderRadius:10, padding:'10px 12px', background:C.bg}}>
+                          <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+                            <button onClick={() => seek(m.start)} style={{...btn, color:C.accent, borderColor:C.accent}} title="Play from here">▶ {podClock(m.start)}–{podClock(m.end)}</button>
+                            <span style={{fontSize:9.5, fontWeight:800, color:sc.fg, background:sc.bg, borderRadius:4, padding:'2px 6px', letterSpacing:'0.04em'}}>{m.top ? '★ BEST · ' : ''}{sc.label.toUpperCase()}</span>
+                            <span style={{fontSize:11, color:C.textMute}}>{Math.max(1, Math.round((m.end - m.start) / 60))} min</span>
+                          </div>
+                          {m.why && <div style={{fontSize:12.5, fontWeight:700, color:C.text, margin:'7px 0 3px'}}>{m.why}</div>}
+                          <div style={{fontSize:12, color:C.textMid, lineHeight:1.6}}>{open || !long ? m.text : m.text.slice(0, 460).replace(/\s+\S*$/, '') + '…'}</div>
+                          <div style={{display:'flex', gap:8, marginTop:7}}>
+                            {long && <button style={btn} onClick={() => setOpenIdx(o => ({ ...o, [i]: !o[i] }))}>{open ? 'Show less' : 'Show all'}</button>}
+                            <button style={btn} onClick={() => copyQuote(m.text.length > 600 ? m.text.slice(0, 600).replace(/\s+\S*$/, '') + '…' : m.text, m.start, i)}>{copied === i ? '✓ Copied' : 'Copy quote'}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {tab === 'transcript' && (
+            <>
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search this transcript…" style={{...inputStyle, marginBottom:10, padding:'7px 10px', fontSize:12}}/>
+              {!doc && !docErr && <div style={{fontSize:12, color:C.textMute}}>Loading transcript…</div>}
+              {doc && (
+                <div>
+                  {needle && <div style={{fontSize:11, color:C.textMute, marginBottom:6}}>{segs.length} matching line{segs.length !== 1 ? 's' : ''}</div>}
+                  {segs.slice(0, 900).map((g, i) => {
+                    const on = cur >= g.s && cur < g.e;
+                    return (
+                      <div key={i} style={{display:'flex', gap:10, padding:'3px 6px', borderRadius:5, background: on ? 'var(--accent-bg, rgba(37,99,235,0.10))' : 'transparent'}}>
+                        <button onClick={() => seek(g.s)} style={{flexShrink:0, width:46, textAlign:'right', border:'none', background:'none', color:C.accent, fontSize:11, fontVariantNumeric:'tabular-nums', cursor:'pointer', padding:0}}>{podClock(g.s)}</button>
+                        <span style={{fontSize:12.5, color:C.text, lineHeight:1.55}}>{mark(g.t)}</span>
+                      </div>
+                    );
+                  })}
+                  {segs.length > 900 && <div style={{fontSize:11, color:C.textMute, padding:'8px 6px'}}>Showing the first 900 lines. Use search to narrow it down.</div>}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose }) {
   const [phase, setPhase] = useState('idle'); // idle|loading|ready|error
   const [items, setItems] = useState([]);
@@ -4550,8 +4838,57 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
   const [activeAudio, setActiveAudio] = useState(null);
   const [loadSecs, setLoadSecs] = useState(0);
   const forceRef = React.useRef(false);
+  const [rankAi, setRankAi] = useState('');
+  const [showWeak, setShowWeak] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [tstat, setTstat] = useState({});        // audioUrl -> { state: none|queued|downloading|transcribing|done|error, progress, key, error }
+  const [pollTick, setPollTick] = useState(0);
+  const [momentsFor, setMomentsFor] = useState(null);
 
   function handleRefresh() { forceRef.current = true; setTick(n => n + 1); }
+
+  // Persist list changes (hide / restore) without disturbing the cache's age.
+  function saveItems(next) {
+    setItems(next);
+    const prev = getCacheEntry(story.id, 'podcasts');
+    setCacheEntry(story.id, 'podcasts', { items: next, queries: prev?.queries || [] });
+  }
+  function setHidden(p, hidden) {
+    if (!p._key) return;
+    podPost('feedback', { storyId: story.id, key: p._key, hidden }).catch(() => {});
+    saveItems(items.map(x => x._key === p._key ? { ...x, _hidden: hidden } : x));
+  }
+  async function startTranscribe(p) {
+    setTstat(m => ({ ...m, [p.audioUrl]: { state: 'queued', progress: 0 } }));
+    try {
+      const r = await podPost('transcribe', { audioUrl: p.audioUrl, title: p.title, podcastTitle: p.podcastTitle, url: p.url, imageUrl: p.imageUrl, date: p.date, storyId: story.id });
+      setTstat(m => ({ ...m, [p.audioUrl]: r }));
+      setPollTick(n => n + 1);
+    } catch (e) {
+      setTstat(m => ({ ...m, [p.audioUrl]: { state: 'error', error: e.message } }));
+    }
+  }
+
+  // Keep transcription badges current while anything is still running.
+  useEffect(() => {
+    const urls = items.map(p => p.audioUrl).filter(Boolean);
+    if (!urls.length) return;
+    let dead = false, timer = null;
+    const tick = async () => {
+      try {
+        const r = await podPost('status', { urls });
+        if (dead) return;
+        setTstat(m => {
+          const next = { ...(r.status || {}) };
+          for (const [u, v] of Object.entries(m)) if (v.state === 'error' && v.error && (!next[u] || next[u].state === 'none')) next[u] = v;   // keep start-up errors visible
+          return next;
+        });
+        if (Object.values(r.status || {}).some(v => v.state === 'queued' || v.state === 'downloading' || v.state === 'transcribing')) timer = setTimeout(tick, 3000);
+      } catch {}
+    };
+    tick();
+    return () => { dead = true; clearTimeout(timer); };
+  }, [items, pollTick]);
 
   useEffect(() => {
     if (phase !== 'loading') { setLoadSecs(0); return; }
@@ -4571,6 +4908,14 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
       setItems(cached.items || []);
       setCachedAt(cached.generatedAt || null);
       setPhase('ready');
+      if (cached.items.some(p => !p._key || p._score == null)) {
+        rankPodcastItems(story, cached.items).then(r => {
+          if (cancelled || !r.list.some(p => p._key)) { if (!cancelled) setRankAi(r.ai); return; }
+          setRankAi(r.ai);
+          setItems(r.list);
+          setCacheEntry(story.id, 'podcasts', { items: r.list, queries: cached.queries });
+        });
+      }
       return;
     }
     setPhase('loading');
@@ -4618,6 +4963,14 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
           }
         }
 
+        // Score and order by relevance to this story (fails open: the search order is kept if the judge is down)
+        if (top.length > 0 && !cancelled) {
+          const rr = await rankPodcastItems(story, top);
+          if (cancelled) return;
+          top = rr.list;
+          setRankAi(rr.ai);
+        }
+
         // Only cache when we actually got results — don't lock out future retries on empty
         if (top.length > 0) {
           setCacheEntry(story.id, 'podcasts', { items: top, queries });
@@ -4638,6 +4991,32 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
   const HL = { fontSize:12.5, fontWeight:800, color:C.textMute, textTransform:'uppercase', letterSpacing:'0.06em' };
   const cacheLabel = cachedAt ? `cached ${fmtS(cachedAt)}` : null;
 
+  // Strong and unscored episodes lead; loose or off-topic ones sit behind a toggle (unless nothing scored well).
+  const live = items.filter(p => !p._hidden);
+  const strongItems = live.filter(p => p._score == null || p._score >= 2);
+  const weakItems = live.filter(p => p._score != null && p._score < 2);
+  const hiddenItems = items.filter(p => p._hidden);
+  const shown = (strongItems.length === 0 || showWeak) ? live : strongItems;
+  const smallBtn = { fontSize:11, fontWeight:700, color:C.accent, background:'none', border:'none', cursor:'pointer', padding:0 };
+  const listControls = (
+    <div style={{padding:'0 24px 16px', display:'flex', flexDirection:'column', gap:8}}>
+      {weakItems.length > 0 && strongItems.length > 0 && (
+        <div><button style={smallBtn} onClick={() => setShowWeak(v => !v)}>{showWeak ? '▾ Hide' : '▸ Show'} {weakItems.length} less relevant episode{weakItems.length !== 1 ? 's' : ''}</button></div>
+      )}
+      {hiddenItems.length > 0 && (
+        <div>
+          <button style={{...smallBtn, color:C.textMute}} onClick={() => setShowHidden(v => !v)}>{showHidden ? '▾' : '▸'} {hiddenItems.length} marked not relevant</button>
+          {showHidden && hiddenItems.map(p => (
+            <div key={p._key} style={{display:'flex', alignItems:'center', gap:8, fontSize:11, color:C.textMute, padding:'4px 0'}}>
+              <span style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1}}>{p.podcastTitle ? p.podcastTitle + ' — ' : ''}{p.title}</span>
+              <button style={smallBtn} onClick={() => setHidden(p, false)}>Restore</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   if (phase !== 'ready') {
     const mm = String(Math.floor(loadSecs / 60)).padStart(2, '0');
     const ss = String(loadSecs % 60).padStart(2, '0');
@@ -4647,7 +5026,7 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
         {phase === 'loading' ? (
           <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:11,color:C.textMute,fontStyle:'italic'}}>
             <span style={{width:8,height:8,borderRadius:'50%',background:C.accent,animation:'chatPulse 1.2s ease-in-out infinite',flexShrink:0}}/>
-            <span>searching podcast episodes… <span style={{fontVariantNumeric:'tabular-nums'}}>{mm}:{ss}</span></span>
+            <span>searching and ranking podcast episodes… <span style={{fontVariantNumeric:'tabular-nums'}}>{mm}:{ss}</span></span>
           </span>
         ) : (
           <>
@@ -4667,6 +5046,7 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
         <span style={{fontSize:10,color:C.textMute}}>·</span>
         <span style={{fontSize:10,color:C.textMute}}>{items.length} episodes</span>
         {cacheLabel && <span style={{fontSize:9.5,color:C.textMute,fontStyle:'italic'}}>· {cacheLabel}</span>}
+        {rankAi === 'unavailable' && <span title="The local model did not answer, so episodes are in search order. Refresh to try again." style={{fontSize:9.5,color:'#b45309',fontStyle:'italic'}}>· relevance judge offline</span>}
         <button onClick={handleRefresh} style={{fontSize:11,color:C.accent,background:'none',border:'none',cursor:'pointer',fontWeight:700,padding:0}}>↻ Refresh</button>
         {onClose && <button onClick={onClose} style={{marginLeft:'auto',background:'none',border:`1px solid ${C.border}`,color:C.textMute,borderRadius:6,fontSize:11,padding:'3px 10px',cursor:'pointer'}}>← Back</button>}
       </div>
@@ -4674,8 +5054,9 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
       {items.length === 0 ? (
         <div style={{padding:'14px 24px',fontSize:12,color:C.textMute}}>No podcast episodes found for this topic yet.</div>
       ) : (
+        <>
         <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:10,padding:'12px 24px 18px'}}>
-          {items.map((p, i) => {
+          {shown.map((p, i) => {
             const dateLabel = p.date ? fmtD(p.date) : '';
             const hasAudio = !!String(p.audioUrl || '').trim();
             const wasAdded = addedIdx === i;
@@ -4704,10 +5085,16 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
                   <div style={{fontSize:12,fontWeight:700,color:C.text,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>
                     {p.title || 'Untitled episode'}
                   </div>
+                  {p._score != null && POD_SCORE[p._score] && (
+                    <div style={{display:'flex', alignItems:'baseline', gap:6, minWidth:0}}>
+                      <span style={{flexShrink:0, fontSize:9, fontWeight:800, letterSpacing:'0.05em', color:POD_SCORE[p._score].fg, background:POD_SCORE[p._score].bg, borderRadius:4, padding:'1px 6px'}}>{POD_SCORE[p._score].label.toUpperCase()}</span>
+                      {p._why && <span title={p._why} style={{fontSize:10.5, color:C.textMute, fontStyle:'italic', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{p._why}</span>}
+                    </div>
+                  )}
                   <div style={{fontSize:11,color:C.textMid,lineHeight:1.5,flex:1,overflow:'hidden'}}>
                     {p.summary || 'No summary available.'}
                   </div>
-                  <div style={{display:'flex',alignItems:'center',gap:7,marginTop:2,flexShrink:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:7,marginTop:2,flexShrink:0,flexWrap:'wrap'}}>
                     <button
                       onClick={() => {
                         if (hasAudio) setActiveAudio(p);
@@ -4728,13 +5115,35 @@ function PodcastsFeed({ story, settings, onAddPodcast, onStoryRefreshed, onClose
                           style={{fontSize:10.5,fontWeight:700,color:C.accent,background:'none',border:`1px solid ${C.accent}`,borderRadius:5,padding:'3px 8px',cursor:'pointer'}}>
                           + Add
                         </button>}
+                    {hasAudio && (() => {
+                      const ts = tstat[p.audioUrl] || { state: 'none' };
+                      if (ts.state === 'done') return (
+                        <button onClick={() => setMomentsFor({ ep: p, key: ts.key })} title="Jump to the parts of this episode about the story"
+                          style={{fontSize:10.5,fontWeight:700,color:'#fff',background:C.accent,border:`1px solid ${C.accent}`,borderRadius:5,padding:'3px 8px',cursor:'pointer'}}>✦ Key moments</button>
+                      );
+                      if (ts.state === 'queued' || ts.state === 'downloading' || ts.state === 'transcribing') return (
+                        <span style={{fontSize:10.5,color:C.textMute,fontStyle:'italic'}}>{ts.state === 'queued' ? 'Waiting…' : ts.state === 'downloading' ? 'Downloading…' : `Transcribing ${Math.round((ts.progress || 0) * 100)}%`}</span>
+                      );
+                      return (
+                        <>
+                          <button onClick={() => startTranscribe(p)} title="Transcribe on this computer with Whisper, then find the parts about this story"
+                            style={{fontSize:10.5,fontWeight:700,color:C.textMid,background:'none',border:`1px solid ${C.border}`,borderRadius:5,padding:'3px 8px',cursor:'pointer'}}>{ts.state === 'error' ? '↻ Retry transcript' : '◧ Transcribe'}</button>
+                          {ts.state === 'error' && <span title={ts.error} style={{fontSize:10,color:'#b91c1c',flexBasis:'100%',lineHeight:1.35}}>{ts.error}</span>}
+                        </>
+                      );
+                    })()}
+                    {p._key && <button onClick={() => setHidden(p, true)} title="Hide this episode for this story and teach the ranking" style={{...smallBtn, color:C.textMute, marginLeft:'auto', fontWeight:600}}>Not relevant</button>}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+        {listControls}
+        </>
       )}
+
+      {momentsFor && <PodcastMoments ep={momentsFor.ep} tkey={momentsFor.key} story={story} onClose={() => setMomentsFor(null)}/>}
 
       {activeAudio && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:24}}
@@ -5874,6 +6283,8 @@ const civicKey = o => `${o.level}|${o.office}|${o.name}`;
 const CIVIC_LEVELS = [['federal', 'Federal'], ['state', 'State'], ['local', 'City, county and schools']];
 // A bare date like 2026-10-06 is read as UTC midnight, which shows as the day before in US time zones: pin it to local noon.
 const civicDate = d => { try { return d ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T12:00:00' : d).toLocaleDateString() : ''; } catch { return ''; } };
+// A term that ends within the next twelve months (federal terms already show "on the ballot" instead).
+const civicTermSoon = o => { const t = o && o.termEnds ? Date.parse(o.termEnds + 'T12:00:00') : NaN; return Number.isFinite(t) && t > Date.now() && t - Date.now() < 366 * 86400000; };
 const SOCIAL_ORDER = ['instagram', 'tiktok', 'twitter', 'facebook', 'youtube', 'mastodon'];
 const SOCIAL_LABEL = { instagram: 'Instagram', tiktok: 'TikTok', twitter: 'X', facebook: 'Facebook', youtube: 'YouTube', mastodon: 'Mastodon' };
 const civicOfficeLine = o => [o.office + (o.district && !/Ward/.test(o.office) ? ' ' + o.district : ''), o.role, o.party].filter(Boolean).join(' · ');
@@ -6051,7 +6462,9 @@ function CivicProfile({ o, civic, onClose, onUpdate }) {
   ].filter(Boolean);
   const facts = [
     ['Represents', represents],
-    o.termEnds ? ['Term ends', civicDate(o.termEnds)] : null,
+    o.termStart && o.termEnds ? ['Term', `${civicDate(o.termStart)} to ${civicDate(o.termEnds)}`] : null,
+    o.termStart && !o.termEnds ? [o.level === 'state' ? 'Current term began' : 'In office since', civicDate(o.termStart)] : null,
+    !o.termStart && o.termEnds ? ['Term ends', civicDate(o.termEnds)] : null,
     o.nextElection && o.level === 'federal' ? ['Next election', String(o.nextElection)] : null,
     o.body ? ['Body', o.body] : null,
   ].filter(f => f && f[1]);
@@ -6067,6 +6480,7 @@ function CivicProfile({ o, civic, onClose, onUpdate }) {
           {o.party && <span className="cv-chip">{o.party}</span>}
           {o.role && <span className="cv-chip">{o.role}</span>}
           {o.upForElection && <span className="cv-chip warn">On the ballot {o.nextElection}</span>}
+          {!o.upForElection && civicTermSoon(o) && <span className="cv-chip warn">Term ends {civicDate(o.termEnds)}</span>}
         </div>
       </div>
 
@@ -6513,7 +6927,135 @@ function CivicOfficeForm({ form, setForm, presets, fixed, busy, onSave, onCancel
   );
 }
 
+// Boards and agendas: a county board, a school board, a Granicus city or any feed, added by pasting an address. Each one can then be
+// watched like the council (see CivicWatch). Nothing is added until you press Add.
+const BOARD_SCOPES = [['county', 'County government'], ['school', 'School board'], ['city', 'City'], ['other', 'Something else']];
+function CivicBoards({ civic, onChange, onChanged, card, eyebrow }) {
+  const [boards, setBoards] = useState(null);
+  const [sugg, setSugg] = useState([]);
+  const [input, setInput] = useState('');
+  const [prev, setPrev] = useState(null);
+  const [scope, setScope] = useState('other');
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const loadBoards = () => civicJson('boards/list').then(d => { if (!d.error) setBoards(d.boards || []); });
+  useEffect(() => {
+    loadBoards();
+    civicPost('boards/suggest', {}).then(d => { if (!d.error) setSugg(d.suggestions || []); });
+  }, [civic.asOf]);
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.55};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:12,padding:0};
+  const kindLabel = { legistar: 'Legistar', granicus: 'Granicus', feed: 'Feed' };
+  const scopeLabel = Object.fromEntries(BOARD_SCOPES);
+
+  async function doPreview() {
+    if (!input.trim() || busy) return;
+    setBusy('preview'); setErr(''); setNote(''); setPrev(null);
+    const d = await civicPost('boards/preview', { input });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    setPrev(d);
+    if (d.kind === 'legistar' && /county/i.test(d.slug + ' ' + d.label)) setScope('county');
+    else if (/school|education/i.test((d.label || '') + ' ' + (d.slug || ''))) setScope('school');
+  }
+  async function add(spec) {
+    setBusy('add'); setErr(''); setNote('');
+    const sc = spec.scope || scope;
+    const d = await civicPost('boards/add', { ...spec, scope: sc });
+    setBusy('');
+    if (d.error) { setErr(d.error); return; }
+    setPrev(null); setInput('');
+    setSugg(s => s.filter(x => !(x.kind === spec.kind && x.slug && x.slug === spec.slug)));
+    setNote(d.members ? `Added. ${d.members} member${d.members === 1 ? '' : 's'} read from its site${sc === 'school' ? ' (under School Board Member)' : ' (under County Commissioner)'}.` : `Added. Switch it on under Watching below to follow it.${d.memberNote ? ' (Members could not be read: ' + d.memberNote + ')' : ''}`);
+    loadBoards(); onChanged();
+    civicJson('profile').then(p => { if (!p.error) onChange(p.profile || null); });
+  }
+  async function remove(id) {
+    setConfirm('');
+    const d = await civicPost('boards/remove', { id });
+    if (!d.error) { loadBoards(); onChanged(); civicJson('profile').then(p => { if (!p.error) onChange(p.profile || null); }); }
+  }
+  async function dismiss(s) { setSugg(x => x.filter(y => y.id !== s.id)); await civicPost('boards/dismiss', { id: s.id }); }
+  const scopeSelect = (
+    <select value={scope} onChange={e => setScope(e.target.value)} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5,padding:'5px 8px'}}>
+      {BOARD_SCOPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+
+  return (
+    <div style={card}>
+      <div style={eyebrow}>Boards and agendas</div>
+      <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.6,marginBottom:8}}>
+        A county board, a school board, or a city that publishes its meetings somewhere other than Legistar. Paste a <strong>Legistar</strong> or <strong>Granicus</strong> address, or a district or county website (Lateral looks for its news or agenda <strong>feed</strong>). Each board you add can then be watched like the council: meeting reminders, new agendas and items.
+      </div>
+
+      {sugg.map(s => (
+        <div key={s.id} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 10px',margin:'6px 0',background:C.accent + '10',border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+          <div style={{flex:'1 1 240px',minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>Found: {s.label}</div>
+            <div style={small}>{s.why} Add it to see your county's meetings and who sits on the board.</div>
+          </div>
+          <Btn onClick={() => add({ kind: s.kind, slug: s.slug, label: s.label, scope: s.scope })} disabled={!!busy} style={{padding:'5px 12px',fontSize:12}}>{busy === 'add' ? 'Adding…' : 'Add'}</Btn>
+          <button onClick={() => dismiss(s)} style={{...link,color:C.textMute,fontWeight:500}}>Not mine</button>
+        </div>
+      ))}
+
+      {(boards || []).map(b => (
+        <div key={b.id} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'7px 0',borderTop:`1px solid ${C.borderLight}`}}>
+          <div style={{flex:'1 1 220px',minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text}}>{b.label.replace(/\s*\((Legistar|Granicus)\)$/, '')}</div>
+            <div style={small}><span style={{fontWeight:700,color:C.accent}}>{kindLabel[b.kind] || b.kind}</span> · {scopeLabel[b.scope] || 'Other'}</div>
+          </div>
+          {confirm === b.id
+            ? <span style={{fontSize:12,color:C.textMid}}>Remove it? <button onClick={() => remove(b.id)} style={{...link,color:'#b91c1c'}}>Yes, remove</button> <button onClick={() => setConfirm('')} style={{...link,color:C.textMute,fontWeight:500}}>Keep</button></span>
+            : <button onClick={() => setConfirm(b.id)} style={{...link,color:C.textMute,fontWeight:500}}>Remove</button>}
+        </div>
+      ))}
+
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginTop:10,paddingTop:10,borderTop:`1px solid ${C.borderLight}`}}>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doPreview(); }} placeholder="Paste an address: yourcounty.legistar.com, yourcity.granicus.com/…, or a website"
+          style={{...inputStyle,flex:'1 1 280px',fontSize:12.5,padding:'7px 10px'}}/>
+        <Btn variant="secondary" onClick={doPreview} disabled={!!busy || !input.trim()} style={{padding:'6px 12px',fontSize:12}}>{busy === 'preview' ? 'Looking…' : 'Look'}</Btn>
+      </div>
+      {err && <div style={{marginTop:8,fontSize:12,color:'#991b1b',lineHeight:1.5}}>{err}</div>}
+      {note && <div style={{marginTop:8,fontSize:12,color:'#166534',lineHeight:1.5}}>{note}</div>}
+
+      {prev && (prev.kind === 'feed'
+        ? (
+          <div style={{marginTop:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.text,marginBottom:4}}>{prev.feeds.length === 1 ? 'Found a feed' : `Found ${prev.feeds.length} feeds`}. Pick what kind of body this is, then add:</div>
+            <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6}}>{scopeSelect}</div>
+            {prev.feeds.map(f => (
+              <div key={f.url} style={{padding:'8px 10px',margin:'6px 0',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+                <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                  <div style={{flex:'1 1 220px',minWidth:0,fontSize:12.5,fontWeight:700,color:C.text}}>{f.title} <span style={{...small,fontWeight:400}}>· {f.count} items</span></div>
+                  <Btn onClick={() => add({ kind: 'feed', url: f.url, label: f.title })} disabled={!!busy} style={{padding:'5px 12px',fontSize:12}}>{busy === 'add' ? 'Adding…' : 'Add this feed'}</Btn>
+                </div>
+                {(f.items || []).map((i, k) => <div key={k} style={{...small,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.date ? civicDate(i.date) + ' · ' : ''}{i.title}</div>)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{marginTop:10,padding:'9px 11px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+            <div style={{fontSize:13,fontWeight:800,color:C.text}}>{prev.label}</div>
+            {(prev.items || []).map((i, k) => <div key={k} style={{...small,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.date ? civicDate(i.date) + ' · ' : ''}{i.title}</div>)}
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+              {scopeSelect}
+              <Btn onClick={() => add(prev.kind === 'legistar' ? { kind: 'legistar', slug: prev.slug, label: prev.label } : { kind: 'granicus', host: prev.host, viewId: prev.viewId, label: prev.label })} disabled={!!busy} style={{padding:'6px 14px',fontSize:12}}>{busy === 'add' ? 'Adding…' : 'Add this board'}</Btn>
+              <button onClick={() => setPrev(null)} style={{...link,color:C.textMute,fontWeight:500}}>Cancel</button>
+            </div>
+            {prev.canListMembers && <div style={{...small,marginTop:6}}>For a county or school board on Legistar, Lateral also lists its members (with term dates) in your profile.</div>}
+          </div>
+        ))}
+      <div style={{...small,marginTop:10}}>BoardDocs and similar portals do not offer a public feed, so they cannot be read. Many districts also publish a news or agenda feed, which can.</div>
+    </div>
+  );
+}
+
 function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStory }) {
+  const [bv, setBv] = useState(0);   // bumps when boards change, so the Watching card reloads
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -6629,7 +7171,9 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
 
         <CivicOffices civic={civic} onChange={onChange} onSelect={onSelect} card={card} eyebrow={eyebrow}/>
 
-        <CivicWatch civicAsOf={civic.asOf} onAddStory={onAddStory} onOpenStory={onOpenStory}/>
+        <CivicBoards civic={civic} onChange={onChange} onChanged={() => setBv(v => v + 1)} card={card} eyebrow={eyebrow}/>
+
+        <CivicWatch civicAsOf={`${civic.asOf}:${bv}`} onAddStory={onAddStory} onOpenStory={onOpenStory}/>
 
         {CIVIC_LEVELS.map(([lv, ttl]) => {
           const list = lv === 'local' ? civicSortLocal(officials.filter(o => o.level === lv)) : officials.filter(o => o.level === lv);
@@ -6645,6 +7189,7 @@ function CivicCenter({ civic, selKey, onSelect, onChange, onAddStory, onOpenStor
                     <span style={{fontSize:13,fontWeight:on ? 800 : 700,color:C.text}}>{o.name}</span>
                     <span style={{fontSize:12,color:C.textMute,flex:1}}>{civicOfficeLine(o)}</span>
                     {o.upForElection && <span style={{fontSize:10.5,fontWeight:700,color:'#92400e'}}>on the ballot {o.nextElection}</span>}
+                    {!o.upForElection && civicTermSoon(o) && <span style={{fontSize:10.5,fontWeight:700,color:'#92400e'}}>term ends {civicDate(o.termEnds)}</span>}
                     <span style={{fontSize:11.5,color:C.textMute}}>{o.email ? '✉' : ''} {o.phone ? '☎' : ''} {(o.social || []).length ? '@' + (o.social || []).length : ''}</span>
                   </button>
                 );
@@ -6719,8 +7264,8 @@ function NavActions({ refreshingHL, refreshHLDone, refreshHLProg, onRefresh, bri
         {briefNudge && <span style={{position:'absolute',top:-3,right:-3,width:8,height:8,borderRadius:'50%',background:'#f59e0b',border:'1.5px solid var(--surface)',boxShadow:'0 0 0 1px #f59e0b'}}/>}
       </button>
       {showNotebook && (
-        <button className="tb-btn" style={{'--tb':'#0f766e'}} onClick={onNotebook} title="Export selected stories as NotebookLM-ready plain-text bundle">
-          <LIcon>{ICONS.export}</LIcon>NotebookLM
+        <button className="tb-btn" style={{'--tb':'#0f766e'}} onClick={onNotebook} title="Export stories: PDF, Markdown or an Obsidian vault">
+          <LIcon>{ICONS.export}</LIcon>Export
         </button>
       )}
       <button className="tb-btn" style={{'--tb':'#7c3aed'}} onClick={onMap} title="Spider Map — visualize story connections">
@@ -8077,9 +8622,14 @@ function PredictionDetail({ predictionId, compact }) {
   if (loading) return <div style={{color:C.textMute,fontSize:13}}>Loading prediction…</div>;
   if (!prediction) return <div style={{color:C.textMute,fontSize:13}}>Prediction not found.</div>;
 
-  const supports = links.filter(l => l.stance === 'supports').sort((a,b) => b.weight - a.weight);
-  const contradicts = links.filter(l => l.stance === 'contradicts').sort((a,b) => b.weight - a.weight);
-  const complicates = links.filter(l => l.stance === 'complicates').sort((a,b) => b.weight - a.weight);
+  // Repeats of a story already counted through a stronger article ("echoes") are left out of these counts and lists.
+  const isEcho = l => !!(l.group && l.group.echo);
+  const byWeight = (a, b) => b.weight - a.weight;
+  const supports = links.filter(l => l.stance === 'supports' && !isEcho(l)).sort(byWeight);
+  const contradicts = links.filter(l => l.stance === 'contradicts' && !isEcho(l)).sort(byWeight);
+  const complicates = links.filter(l => l.stance === 'complicates' && !isEcho(l)).sort(byWeight);
+  const repeatsOf = st => links.filter(l => l.stance === st && isEcho(l)).length;
+  const RepeatNote = ({ st }) => repeatsOf(st) > 0 ? <span style={{fontWeight:600,textTransform:'none',letterSpacing:0,color:C.textMute}}> · +{repeatsOf(st)} repeat{repeatsOf(st) !== 1 ? 's' : ''}</span> : null;
 
   if (compact) {
     return (
@@ -8096,13 +8646,13 @@ function PredictionDetail({ predictionId, compact }) {
         </div>
         {supports.length > 0 && (
           <div>
-            <div style={{fontSize:10,fontWeight:800,color:'#059669',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:4}}>🟢 Supports ({supports.length})</div>
+            <div style={{fontSize:10,fontWeight:800,color:'#059669',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:4}}>🟢 Supports ({supports.length}){<RepeatNote st="supports"/>}</div>
             <div style={{fontSize:11,color:C.textMute}}>Top: {supports[0].weight} · {supports[0].item?.title?.slice(0,40) || 'Untitled'}</div>
           </div>
         )}
         {contradicts.length > 0 && (
           <div>
-            <div style={{fontSize:10,fontWeight:800,color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:4}}>🔴 Contradicts ({contradicts.length})</div>
+            <div style={{fontSize:10,fontWeight:800,color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:4}}>🔴 Contradicts ({contradicts.length}){<RepeatNote st="contradicts"/>}</div>
             <div style={{fontSize:11,color:C.textMute}}>Top: {contradicts[0].weight} · {contradicts[0].item?.title?.slice(0,40) || 'Untitled'}</div>
           </div>
         )}
@@ -8130,7 +8680,7 @@ function PredictionDetail({ predictionId, compact }) {
 
       {supports.length > 0 && (
         <div>
-          <div style={{fontSize:10,fontWeight:800,color:'#059669',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>🟢 Supports</div>
+          <div style={{fontSize:10,fontWeight:800,color:'#059669',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>🟢 Supports{<RepeatNote st="supports"/>}</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {supports.slice(0,3).map(link => (
               <a key={link.id} href={link.item?.url} target="_blank" rel="noopener noreferrer"
@@ -8146,7 +8696,7 @@ function PredictionDetail({ predictionId, compact }) {
 
       {contradicts.length > 0 && (
         <div>
-          <div style={{fontSize:10,fontWeight:800,color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>🔴 Contradicts</div>
+          <div style={{fontSize:10,fontWeight:800,color:'#dc2626',textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>🔴 Contradicts{<RepeatNote st="contradicts"/>}</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
             {contradicts.slice(0,3).map(link => (
               <a key={link.id} href={link.item?.url} target="_blank" rel="noopener noreferrer"
@@ -8425,7 +8975,7 @@ function buildDiscoverEditorialRows(articles) {
   return rows;
 }
 
-function DiscoverEditorialRows({ rows, onAddArticle }) {
+function DiscoverEditorialRows({ rows, onAddArticle, alsoOf }) {
   return (
     <div style={{display:'flex',flexDirection:'column',gap:18,paddingBottom:4}}>
       {rows.map((row, ri) => (
@@ -8434,20 +8984,20 @@ function DiscoverEditorialRows({ rows, onAddArticle }) {
             row.align === 'left'
               ? <div key={`f-${ri}`} style={{display:'grid',gridTemplateColumns:'minmax(0,1.75fr) minmax(0,1fr)',gap:12,alignItems:'stretch'}}>
                   <div style={{minWidth:0}}>
-                    <ArticleCard article={row.article} feature onAddEp={() => onAddArticle(row.article)} />
+                    <ArticleCard article={row.article} feature also={alsoOf && alsoOf(row.article.url)} onAddEp={() => onAddArticle(row.article)} />
                   </div>
                   <div />
                 </div>
               : <div key={`f-${ri}`} style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1.75fr)',gap:12,alignItems:'stretch'}}>
                   <div />
                   <div style={{minWidth:0}}>
-                    <ArticleCard article={row.article} feature onAddEp={() => onAddArticle(row.article)} />
+                    <ArticleCard article={row.article} feature also={alsoOf && alsoOf(row.article.url)} onAddEp={() => onAddArticle(row.article)} />
                   </div>
                 </div>
           )
           : <div key={`t-${ri}`} style={{display:'grid',gridTemplateColumns:'repeat(3, minmax(0, 1fr))',gap:10}}>
               {row.articles.map((a, i) => (
-                <ArticleCard key={a.url || `${ri}-${i}`} article={a} onAddEp={() => onAddArticle(a)} />
+                <ArticleCard key={a.url || `${ri}-${i}`} article={a} also={alsoOf && alsoOf(a.url)} onAddEp={() => onAddArticle(a)} />
               ))}
             </div>
       ))}
@@ -8482,7 +9032,8 @@ function DiscoverModal({ story, onClose, onAdd, settings }) {
     : articles;
   const isFiltered = activeSources !== null;
 
-  const editorialRows = React.useMemo(() => buildDiscoverEditorialRows(displayedArticles), [displayedArticles]);
+  const discoverGroups = useArticleGroups(displayedArticles);
+  const editorialRows = React.useMemo(() => buildDiscoverEditorialRows(discoverGroups.lead), [discoverGroups]);
 
   const busyActive = phase === 'searching' || addingUrl !== null;
   const busyLabel = phase === 'searching'
@@ -8764,7 +9315,7 @@ function DiscoverModal({ story, onClose, onAdd, settings }) {
           </div>
 
           <div style={{maxHeight:540,overflowY:'auto',paddingRight:2}}>
-            <DiscoverEditorialRows rows={editorialRows} onAddArticle={addArticle} />
+            <DiscoverEditorialRows rows={editorialRows} onAddArticle={addArticle} alsoOf={discoverGroups.also} />
           </div>
           <FilteredOutList items={filteredOut} onRestore={restoreDiscovered} padX={2}/>
 
@@ -9338,6 +9889,7 @@ function FeedsPanel({ stories }) {
   const rows = [
     ['Activity', 'Everything on your Activity list: prediction moves, resolution dates, new coverage.', `${root}/activity.xml`],
     ['All stories', 'New articles and episodes across every story you track.', `${root}/stories.xml`],
+    ['Prediction flips', 'One item each time a prediction’s evidence changes direction. Quiet, and easy to scan.', `${root}/flips.xml`],
   ];
   const story = (stories || []).find(x => x.id === pick);
   const copy = url => setMsg(copyText(url) ? 'Copied.' : 'Select the address and copy it.');
@@ -9374,11 +9926,20 @@ function FeedsPanel({ stories }) {
               <Btn variant="secondary" onClick={() => copy(`${root}/story/${story.id}.xml`)} style={{padding:'4px 12px',fontSize:12}}>Copy</Btn>
             </div>
           )}
+          {story && story.predictionId && token && (
+            <div style={{marginTop:8}}>
+              <div style={{fontSize:11.5,color:C.textMute,margin:'0 0 4px'}}>Just this prediction’s moves (⚑ marks a change of direction):</div>
+              <div style={{display:'flex',gap:8}}>
+                <input readOnly value={`${root}/prediction/${story.predictionId}.xml`} onFocus={e => e.target.select()} style={{...inputStyle,flex:1,fontSize:11.5}}/>
+                <Btn variant="secondary" onClick={() => copy(`${root}/prediction/${story.predictionId}.xml`)} style={{padding:'4px 12px',fontSize:12}}>Copy</Btn>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div style={head}>Subscribe to everything at once</div>
       <div style={box}>
-        <div style={{fontSize:12,color:C.textMid,lineHeight:1.5,marginBottom:8}}>An OPML file lists the activity feed, the all-stories feed and one feed per story. Most feed readers can import it.</div>
+        <div style={{fontSize:12,color:C.textMid,lineHeight:1.5,marginBottom:8}}>An OPML file lists the activity feed, the all-stories feed, the prediction-flips feed and one feed per story. Most feed readers can import it.</div>
         {token && <a href={`${root}/lateral.opml?base=${encodeURIComponent(base.replace(/\/+$/, ''))}`} download="lateral.opml" style={{fontSize:12,fontWeight:700,color:C.accent}}>Download lateral.opml</a>}
       </div>
       <div style={head}>Following feeds</div>
@@ -9426,8 +9987,18 @@ const timeAgo = iso => {
 // The inbox: everything Lateral noticed, newest first. Works with no delivery channel set up at all.
 function ActivityModal({ onClose, onOpenStory, onOpenSettings, onChanged }) {
   const [events, setEvents] = useState(null);
-  const load = () => alertsJson('events?limit=100').then(d => setEvents(d.events || []));
+  const [mutedIds, setMutedIds] = useState([]);
+  const [muteFor, setMuteFor] = useState(null);   // event id whose mute choices are open
+  const load = () => {
+    alertsJson('events?limit=100').then(d => setEvents(d.events || []));
+    alertsJson('config').then(d => setMutedIds(((d.config && d.config.muted) || []).map(m => m.storyId)));
+  };
   useEffect(() => { load(); }, []);
+  async function muteStory(storyId, hours) {
+    setMuteFor(null);
+    await alertsPost(hours === -1 ? 'unmute' : 'mute', { storyId, hours: hours === -1 ? undefined : hours });
+    await load(); if (onChanged) onChanged();
+  }
   async function open(e) {
     if (!e.read) { await alertsPost('read', { ids: [e.id] }); if (onChanged) onChanged(); }
     if (e.storyId) onOpenStory(e.storyId); else load();
@@ -9452,10 +10023,13 @@ function ActivityModal({ onClose, onOpenStory, onOpenSettings, onChanged }) {
       <div style={{maxHeight:'60vh',overflowY:'auto'}}>
         {(events || []).map(e => {
           const k = ALERT_KIND[e.kind] || ALERT_KIND['story-activity'];
+          const isMutedStory = !!e.storyId && mutedIds.includes(e.storyId);
+          const mutePick = { background:'none', border:'none', cursor:'pointer', color:C.accent, fontSize:11, fontWeight:700, padding:0 };
           return (
-            <button key={e.id} onClick={() => open(e)}
-              style={{display:'flex',gap:11,width:'100%',textAlign:'left',padding:'10px 12px',marginBottom:6,borderRadius:9,cursor:'pointer',
-                background:e.read ? C.bg : C.surface,border:`1px solid ${e.read ? C.borderLight : C.border}`,opacity:e.read ? 0.78 : 1}}>
+            <div key={e.id} style={{marginBottom:6}}>
+            <button onClick={() => open(e)}
+              style={{display:'flex',gap:11,width:'100%',textAlign:'left',padding:'10px 12px',marginBottom:0,borderRadius:9,cursor:'pointer',
+                background:e.read ? C.bg : C.surface,border:`1px solid ${e.read ? C.borderLight : C.border}`,opacity:e.muted ? 0.55 : e.read ? 0.78 : 1}}>
               <span style={{width:28,height:28,borderRadius:8,background:k.color + '1f',color:k.color,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><LIcon size={15}>{ICONS[k.icon]}</LIcon></span>
               <span style={{flex:1,minWidth:0}}>
                 <span style={{display:'flex',gap:8,alignItems:'baseline'}}>
@@ -9464,10 +10038,24 @@ function ActivityModal({ onClose, onOpenStory, onOpenSettings, onChanged }) {
                 </span>
                 {e.body && <span style={{display:'block',fontSize:12,color:C.textMid,lineHeight:1.5,marginTop:3,whiteSpace:'pre-line'}}>{e.body}</span>}
                 <span style={{display:'block',fontSize:10.5,color:C.textMute,marginTop:4}}>
-                  {k.label}{e.severity === 'important' ? ' · important' : ''}{Array.isArray(e.delivered) ? ` · sent to ${e.delivered.filter(r => r.ok).length} of ${e.delivered.length} channel${e.delivered.length === 1 ? '' : 's'}` : ''}
+                  {k.label}{e.severity === 'important' ? ' · important' : ''}{e.muted ? ' · muted story' : ''}{e.delivered === 'held' ? ' · held for quiet hours' : ''}{Array.isArray(e.delivered) ? ` · sent to ${e.delivered.filter(r => r.ok).length} of ${e.delivered.length} channel${e.delivered.length === 1 ? '' : 's'}` : ''}
                 </span>
               </span>
             </button>
+            {e.storyId && (
+              <div style={{padding:'3px 14px 0',fontSize:11,color:C.textMute,display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                {isMutedStory
+                  ? <><span>🔕 This story is muted.</span><button style={mutePick} onClick={() => muteStory(e.storyId, -1)}>Unmute</button></>
+                  : muteFor === e.id
+                    ? <><span>Mute this story for</span>
+                        <button style={mutePick} onClick={() => muteStory(e.storyId, 24)}>1 day</button>
+                        <button style={mutePick} onClick={() => muteStory(e.storyId, 168)}>1 week</button>
+                        <button style={mutePick} onClick={() => muteStory(e.storyId, 0)}>until I unmute</button>
+                        <button style={{...mutePick,color:C.textMute,fontWeight:500}} onClick={() => setMuteFor(null)}>cancel</button></>
+                    : <button style={{...mutePick,color:C.textMute,fontWeight:500}} onClick={() => setMuteFor(e.id)} title="Stop alerts from this story. It still shows here, dimmed.">🔕 Mute this story</button>}
+              </div>
+            )}
+            </div>
           );
         })}
       </div>
@@ -9481,7 +10069,8 @@ function AlertsPanel() {
   const [status, setStatus] = useState(null);
   const [saved, setSaved] = useState('');
   const [tests, setTests] = useState({});
-  const [draft, setDraft] = useState({ type: 'ntfy', name: '', server: 'https://ntfy.sh', topic: '', token: '', url: '' });
+  const EMPTY_DRAFT = { type: 'ntfy', name: '', server: 'https://ntfy.sh', topic: '', token: '', url: '', host: '', port: '', secure: 'starttls', user: '', pass: '', from: '', to: '', allowSelfSigned: false };
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [adding, setAdding] = useState(false);
   const [msg, setMsg] = useState('');
   const [preview, setPreview] = useState(null);
@@ -9520,11 +10109,13 @@ function AlertsPanel() {
   const channelsForSave = list => list.map(c => ({ id: c.id, type: c.type, name: c.name, enabled: c.enabled, server: c.server }));
 
   async function addChannel() {
-    const body = { ...draft, name: draft.name || ({ ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook' }[draft.type]) };
-    if (draft.type === 'ntfy' ? !draft.topic.trim() : !/^https?:\/\//i.test(draft.url.trim())) { setMsg(draft.type === 'ntfy' ? 'Enter a topic name.' : 'Enter the full URL, starting with https://'); return; }
+    const body = { ...draft, name: draft.name || ({ ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook', email: 'Email' }[draft.type]) };
+    if (draft.type === 'email') {
+      if (!draft.host.trim() || !draft.to.trim() || !(draft.from.trim() || draft.user.trim())) { setMsg('Email needs a server, a from address and at least one to address.'); return; }
+    } else if (draft.type === 'ntfy' ? !draft.topic.trim() : !/^https?:\/\//i.test(draft.url.trim())) { setMsg(draft.type === 'ntfy' ? 'Enter a topic name.' : 'Enter the full URL, starting with https://'); return; }
     setMsg('');
     const d = await alertsPost('config', { channels: [...channelsForSave(cfg.channels), body] });
-    if (d.config) { setCfg(d.config); setAdding(false); setDraft({ type: 'ntfy', name: '', server: 'https://ntfy.sh', topic: '', token: '', url: '' }); load(); }
+    if (d.config) { setCfg(d.config); setAdding(false); setDraft(EMPTY_DRAFT); load(); }
   }
   async function test(id) {
     setTests(t => ({ ...t, [id]: '…' }));
@@ -9549,7 +10140,7 @@ function AlertsPanel() {
       <span>{label}{hintText && <span style={{display:'block',...small}}>{hintText}</span>}</span>
     </label>
   );
-  const typeLabel = { ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook' };
+  const typeLabel = { ntfy: 'ntfy', discord: 'Discord', slack: 'Slack', webhook: 'Webhook', email: 'Email' };
 
   return (
     <div>
@@ -9566,7 +10157,7 @@ function AlertsPanel() {
             <input type="checkbox" checked={ch.enabled} title="Send alerts to this channel" onChange={e => change({ channels: channelsForSave(cfg.channels).map(c => c.id === ch.id ? { ...c, enabled: e.target.checked } : c) }, true)}/>
             <div style={{flex:1,minWidth:140}}>
               <div style={{fontSize:13,fontWeight:700,color:C.text}}>{ch.name} <span style={{fontSize:10.5,fontWeight:700,color:C.accent,border:`1px solid ${C.border}`,borderRadius:8,padding:'1px 7px',marginLeft:4}}>{typeLabel[ch.type]}</span></div>
-              <div style={small}>{ch.type === 'ntfy' ? `${ch.server.replace(/^https?:\/\//, '')} · topic ${ch.topicHint}` : ch.urlHint}</div>
+              <div style={small}>{ch.type === 'ntfy' ? `${ch.server.replace(/^https?:\/\//, '')} · topic ${ch.topicHint}` : ch.type === 'email' ? `${ch.host}${ch.port ? ':' + ch.port : ''} → ${ch.to}` : ch.urlHint}</div>
             </div>
             <button onClick={() => test(ch.id)} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:'3px 10px'}}>Send test</button>
             {tests[ch.id] && <span style={{fontSize:11.5,color:tests[ch.id].startsWith('✓') ? '#059669' : tests[ch.id] === '…' ? C.textMute : '#dc2626'}}>{tests[ch.id]}</span>}
@@ -9577,11 +10168,31 @@ function AlertsPanel() {
           <div style={{marginTop:10}}>
             <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
               <select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}>
-                <option value="ntfy">ntfy (phone push)</option><option value="discord">Discord</option><option value="slack">Slack</option><option value="webhook">Webhook (anything else)</option>
+                <option value="ntfy">ntfy (phone push)</option><option value="discord">Discord</option><option value="slack">Slack</option><option value="email">Email (SMTP)</option><option value="webhook">Webhook (anything else)</option>
               </select>
               <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="Name (optional)" style={{...inputStyle,flex:1,minWidth:120,fontSize:12.5}}/>
             </div>
-            {draft.type === 'ntfy' ? (
+            {draft.type === 'email' ? (
+              <>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                  <input value={draft.host} onChange={e => setDraft({ ...draft, host: e.target.value })} placeholder="SMTP server, e.g. smtp.gmail.com" style={{...inputStyle,flex:2,minWidth:180,fontSize:12.5}}/>
+                  <input value={draft.port} onChange={e => setDraft({ ...draft, port: e.target.value.replace(/\D/g, '') })} placeholder="Port" style={{...inputStyle,flex:'0 0 80px',fontSize:12.5}}/>
+                  <select value={draft.secure} onChange={e => setDraft({ ...draft, secure: e.target.value })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}>
+                    <option value="starttls">STARTTLS (usually 587)</option><option value="tls">SSL/TLS (usually 465)</option><option value="none">None (local relay)</option>
+                  </select>
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                  <input value={draft.user} onChange={e => setDraft({ ...draft, user: e.target.value })} placeholder="Username (often your email address)" autoComplete="off" style={{...inputStyle,flex:1,minWidth:180,fontSize:12.5}}/>
+                  <input type="password" value={draft.pass} onChange={e => setDraft({ ...draft, pass: e.target.value })} placeholder="Password or app password" autoComplete="new-password" style={{...inputStyle,flex:1,minWidth:160,fontSize:12.5}}/>
+                </div>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <input value={draft.from} onChange={e => setDraft({ ...draft, from: e.target.value })} placeholder="From address" style={{...inputStyle,flex:1,minWidth:180,fontSize:12.5}}/>
+                  <input value={draft.to} onChange={e => setDraft({ ...draft, to: e.target.value })} placeholder="Send to (comma-separated)" style={{...inputStyle,flex:1,minWidth:180,fontSize:12.5}}/>
+                </div>
+                <div style={{...small,marginTop:6}}>Gmail, iCloud and Outlook need an <em>app password</em> rather than your normal one. The password is stored only on this computer and is never shown again.</div>
+                <label style={{display:'flex',alignItems:'center',gap:7,...small,marginTop:6,cursor:'pointer'}}><input type="checkbox" checked={draft.allowSelfSigned} onChange={e => setDraft({ ...draft, allowSelfSigned: e.target.checked })}/> Accept a self-signed certificate (for a mail server on your own network)</label>
+              </>
+            ) : draft.type === 'ntfy' ? (
               <>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
                   <input value={draft.topic} onChange={e => setDraft({ ...draft, topic: e.target.value })} placeholder="Topic, e.g. my-lateral-alerts-8f3k" style={{...inputStyle,flex:1,minWidth:200,fontSize:12.5}}/>
@@ -9639,6 +10250,39 @@ function AlertsPanel() {
           <strong style={{fontSize:12.5,color:C.text}}>{cfg.sensitivity.scoreDelta} points</strong>
         </div>
         <div style={small}>A change of direction always counts. Lower numbers mean more alerts.</div>
+      </div>
+
+      <div style={head}>Quiet hours</div>
+      <div style={box}>
+        {check('Don’t send alerts during these hours', cfg.quiet.enabled, v => change({ quiet: { enabled: v, tzOffsetMin: new Date().getTimezoneOffset() } }, true), 'Alerts are held, still listed in Activity, and sent afterwards as one message instead of waking your phone.')}
+        {cfg.quiet.enabled && (
+          <>
+            <div style={{display:'flex',alignItems:'center',gap:10,margin:'6px 0 2px 24px',flexWrap:'wrap'}}>
+              <span style={small}>From</span>
+              <input type="time" value={cfg.quiet.from} onChange={e => change({ quiet: { from: e.target.value, tzOffsetMin: new Date().getTimezoneOffset() } })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}/>
+              <span style={small}>until</span>
+              <input type="time" value={cfg.quiet.to} onChange={e => change({ quiet: { to: e.target.value, tzOffsetMin: new Date().getTimezoneOffset() } })} style={{...inputStyle,width:'auto',flex:'none',fontSize:12.5}}/>
+              {cfg.quietNow && <span style={{fontSize:11,fontWeight:700,color:'#7c3aed'}}>🌙 quiet right now</span>}
+            </div>
+            <div style={{marginLeft:24}}>
+              {check('Still send important alerts', cfg.quiet.allowImportant, v => change({ quiet: { allowImportant: v } }), 'For example a prediction’s evidence changing direction, or something breaking.')}
+            </div>
+            {cfg.digest.enabled && <div style={{...small,marginLeft:24,marginTop:4}}>The daily digest waits until quiet hours end if its time falls inside them.</div>}
+          </>
+        )}
+      </div>
+
+      <div style={head}>Muted stories</div>
+      <div style={box}>
+        {(cfg.muted || []).length === 0
+          ? <div style={small}>None. To silence a story, open <strong>Activity</strong> and choose “Mute this story” under one of its updates. Muted stories still list their updates there, dimmed, but never send them and stay out of the digest.</div>
+          : (cfg.muted || []).map(m => (
+              <div key={m.storyId} style={{display:'flex',alignItems:'center',gap:10,padding:'5px 0',borderBottom:`1px solid ${C.borderLight}`}}>
+                <span style={{flex:1,minWidth:0,fontSize:12.5,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>🔕 {m.title}</span>
+                <span style={small}>{m.until ? `until ${new Date(m.until).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'until you unmute'}</span>
+                <button onClick={async () => { const d = await alertsPost('unmute', { storyId: m.storyId }); if (d.config) setCfg(d.config); }} style={{background:'none',border:`1px solid ${C.border}`,borderRadius:7,cursor:'pointer',color:C.accent,fontSize:11.5,fontWeight:700,padding:'2px 10px'}}>Unmute</button>
+              </div>
+            ))}
       </div>
 
       <div style={head}>Keep predictions fresh</div>
@@ -10450,90 +11094,427 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavil
   );
 }
 
-function NotebookLMExportModal({ stories, onClose }) {
-  const candidates = (stories || []).filter(s => (s.episodes || []).length > 0);
-  const [selected, setSelected] = useState(() => new Set(candidates.map(s => s.id)));
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('');
+// ─── Export ───────────────────────────────────────────────────────────────────
+// One modal for getting stories out of Lateral: a print-ready PDF (what NotebookLM, email and sharing accept), a single Markdown
+// file, or an Obsidian vault (a zip of linked notes). Markdown and the vault can also carry saved article text and podcast key
+// moments. Everything between the markers below is pure (no network, no DOM) so it can be tested on its own.
 
-  function toggle(storyId) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(storyId)) next.delete(storyId);
-      else next.add(storyId);
-      return next;
-    });
+// <export-pure>
+const EXPORT_FORMATS = [
+  { id: 'pdf',   label: 'PDF',            hint: 'A print-ready page with each story\'s timeline and prediction evidence. NotebookLM, email and sharing all take PDFs.' },
+  { id: 'md',    label: 'Markdown file',  hint: 'One .md file with every story, easy for NotebookLM, other AI tools and notes apps to read.' },
+  { id: 'vault', label: 'Obsidian vault', hint: 'A .zip of linked notes (stories, saved articles, podcasts) with frontmatter and [[wikilinks]]. Unzip it into your vault.' },
+];
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// A .zip with no compression (notes are small text): files = [{ name, text }]. Names are UTF-8 (flag bit 11).
+function makeZip(files) {
+  const enc = new TextEncoder();
+  const u16 = n => [n & 255, (n >> 8) & 255];
+  const u32 = n => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const local = new Uint8Array([0x50, 0x4b, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(dosTime), ...u16(dosDate), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0)]);
+    parts.push(local, name, data);
+    central.push({ name, crc, size: data.length, offset });
+    offset += local.length + name.length + data.length;
   }
-
-  function selectAll() {
-    setSelected(new Set(candidates.map(s => s.id)));
+  const cdStart = offset;
+  for (const c of central) {
+    const h = new Uint8Array([0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(dosTime), ...u16(dosDate), ...u32(c.crc), ...u32(c.size), ...u32(c.size), ...u16(c.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(c.offset)]);
+    parts.push(h, c.name);
+    offset += h.length + c.name.length;
   }
+  parts.push(new Uint8Array([0x50, 0x4b, 5, 6, 0, 0, 0, 0, ...u16(central.length), ...u16(central.length), ...u32(offset - cdStart), ...u32(cdStart), ...u16(0)]));
+  return new Blob(parts, { type: 'application/zip' });
+}
 
-  function clearAll() {
-    setSelected(new Set());
+// A note's file name: no characters Obsidian or Windows dislike, no clashes (case-insensitive).
+function exportNoteName(text, used, fallback) {
+  let n = String(text || '').replace(/[\\/:*?"<>|#^\[\]]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+  if (!n) n = fallback || 'Untitled';
+  n = n.slice(0, 80).trim();
+  let out = n, i = 2;
+  while (used.has(out.toLowerCase())) out = `${n} (${i++})`;
+  used.add(out.toLowerCase());
+  return out;
+}
+const yamlStr = s => JSON.stringify(String(s == null ? '' : s));        // a JSON string is a valid YAML scalar
+const exportDay = d => { const p = parseDateSafe(d); return p && !isNaN(p) ? p.toISOString().slice(0, 10) : String(d || '').slice(0, 10); };
+const mdLink = (text, url) => { const t = String(text || url || '').replace(/[\[\]]/g, ''); return url ? `[${t}](${url})` : t; };
+const clipTxt = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s; };
+const exportClock = sec => { sec = Math.max(0, Math.floor(Number(sec) || 0)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60; return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(x).padStart(2, '0'); };
+const actorNames = story => (story.actors || []).map(a => (typeof a === 'string' ? a : a && a.name) || '').filter(Boolean);
+const storyTitleOf = story => String(story.title || 'Untitled').replace(/\s*\(Prediction\)\s*$/, '');
+const demote = text => String(text || '').replace(/^#{1,6} /gm, '##### ');   // an article's own headings sit below ours
+
+function episodeKind(ep) {
+  if (ep.episodeType === 'brief') return 'Brief';
+  if (ep.episodeType === 'web-summary') return 'Summary';
+  if (ep.videoUrl) return 'Video';
+  if (ep.audioUrl) return 'Podcast';
+  if (ep.socialPlatform) return 'Social';
+  return (EP[ep.type] || EP.development).label;
+}
+
+// Stories that share an actor, or two tags, are related. Returns { [storyId]: [storyId…] } among the stories given.
+function relatedStories(stories) {
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const info = stories.map(s => ({ id: s.id, tags: new Set((s.tags || []).map(norm).filter(Boolean)), actors: new Set(actorNames(s).map(norm)) }));
+  const out = {};
+  for (const a of info) {
+    out[a.id] = info.filter(b => b.id !== a.id && ([...a.actors].some(x => b.actors.has(x)) || [...a.tags].filter(x => b.tags.has(x)).length >= 2)).map(b => b.id);
   }
+  return out;
+}
 
-  async function runExport() {
-    if (!selected.size || busy) return;
-    setBusy(true);
-    setStatus('Building PDF…');
-    let win = null;
-    try {
-      const picked = candidates.filter(s => selected.has(s.id));
-      if (!picked.length) throw new Error('No stories selected');
-      // Open the tab inside the click (pop-up blockers), then fetch prediction evidence before building the page.
-      win = window.open('', '_blank');
-      if (!win) throw new Error('Pop-up blocked — allow pop-ups and try again');
-      const predMap = await fetchPredictionShareData(picked);
-      // PDF, not a ZIP of plain-text files — a blob download only works in the
-      // tab that made it, and NotebookLM won't take an .html upload at all,
-      // but it (and every friend's inbox) takes a PDF just fine. Same proven
-      // mechanism as the per-story Share button, just looping the sections.
-      const html = buildMultiStoryShareHtml(picked, predMap);
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      win.location.href = url;
-      setTimeout(() => URL.revokeObjectURL(url), 120000);
-      setStatus(`✓ Opened ${picked.length} stor${picked.length===1?'y':'ies'} — click Download PDF in the new tab`);
-    } catch (e) {
-      if (win) { try { win.close(); } catch (err) {} }
-      setStatus(`Failed: ${e.message || 'export failed'}`);
-    } finally {
-      setBusy(false);
+// x: { vault, pred, articles:[{ name, doc }], podcasts:[{ name, item, sections, transcribed }], related:[note names], opts }
+function storyMarkdown(story, x) {
+  const L = [];
+  const title = storyTitleOf(story);
+  const stCfg = ST[story.status] || ST.active;
+  const eps = [...(story.episodes || [])].sort((a, b) => (parseDateSafe(a.date)?.getTime() ?? 0) - (parseDateSafe(b.date)?.getTime() ?? 0));
+  const actors = actorNames(story);
+  if (x.vault) {
+    L.push('---', `title: ${yamlStr(title)}`, 'type: lateral-story', `status: ${yamlStr(stCfg.label.toLowerCase())}`,
+      `created: ${yamlStr(exportDay(story.createdAt))}`, `updated: ${yamlStr(exportDay(story.updatedAt || story.createdAt))}`,
+      `tags: [${['lateral', ...(story.tags || [])].map(t => yamlStr(String(t).trim().replace(/\s+/g, '-'))).join(', ')}]`,
+      ...(actors.length ? [`actors: [${actors.map(yamlStr).join(', ')}]`] : []), ...(story.predictionId ? ['prediction: true'] : []),
+      `lateral_id: ${yamlStr(story.id)}`, '---', '');
+  }
+  L.push(`# ${title}`, '');
+  if (story.summary) L.push(...String(story.summary).split('\n').map(l => `> ${l}`), '');
+  const first = eps[0], last = eps[eps.length - 1];
+  const range = first && last ? (exportDay(first.date) === exportDay(last.date) ? exportDay(first.date) : `${exportDay(first.date)} to ${exportDay(last.date)}`) : '';
+  L.push(`**Status:** ${stCfg.label} · ${eps.length} episode${eps.length === 1 ? '' : 's'}${range ? ' · ' + range : ''}`);
+  if ((story.tags || []).length) L.push(`**Tags:** ${(story.tags || []).slice(0, 10).join(', ')}`);
+  if (actors.length) L.push(`**People and groups:** ${actors.slice(0, 12).join(', ')}`);
+  L.push('');
+
+  if (story.predictionId) {
+    L.push('## Prediction', '');
+    const p = x.pred && x.pred.prediction;
+    if (!p) L.push('_The evidence could not be loaded when this was exported._', '');
+    else {
+      L.push(`**Claim:** ${p.statement || story.summary || title}`, '');
+      const bits = [];
+      if (p.confidence != null) bits.push(`Your confidence: ${p.confidence}%`);
+      bits.push(`Status: ${p.status || 'active'}`);
+      if (p.resolutionDate) bits.push(`Resolves: ${String(p.resolutionDate).slice(0, 10)}`);
+      if (p.resolution && p.resolution.outcome) bits.push(`Outcome: ${p.resolution.outcome === 'yes' ? 'Yes, it happened' : 'No, it did not'}`);
+      L.push(bits.join(' · '), '');
+      const ev = x.pred.evidence;
+      if (ev) {
+        const lean = { closer: 'toward TRUE', further: 'toward FALSE', mixed: 'mixed', none: 'no clear lean yet' }[ev.direction] || '';
+        L.push(`**Evidence balance:** ${ev.score != null ? (ev.score > 0 ? '+' : '') + ev.score : ''} ${lean ? '(' + lean + (ev.strength && ev.strength !== 'none' ? ', ' + ev.strength + ' evidence' : '') + ')' : ''}`.trim(), '');
+      }
+      const links = x.pred.links || [];
+      for (const [st, label] of [['supports', 'Supporting evidence'], ['contradicts', 'Contradicting evidence'], ['complicates', 'Complicating evidence']]) {
+        const list = links.filter(l => l.stance === st).sort((a, b) => (b.weight || 0) - (a.weight || 0));
+        if (!list.length) continue;
+        L.push(`### ${label} (${list.length})`, '');
+        for (const l of list) {
+          const it = l.item || {};
+          L.push(`- ${mdLink(it.title || 'Untitled', it.url)}${it.source ? ' · ' + it.source : ''} · weight ${Number(l.weight) || 0}${l.reason ? '\n  - ' + clipTxt(l.reason, 300) : ''}`);
+        }
+        L.push('');
+      }
     }
   }
 
+  L.push('## Timeline', '');
+  if (!eps.length) L.push('_No episodes tracked yet._', '');
+  for (const ep of eps) {
+    L.push(`### ${exportDay(ep.date)} · ${episodeKind(ep)}: ${ep.headline || 'Untitled episode'}`, '');
+    if (ep.summary) L.push(ep.summary, '');
+    if (ep.framingNote) L.push(...String(ep.framingNote).split('\n').map(l => `> _${l}_`), '');
+    const links = [];
+    if (Array.isArray(ep.sourceLinks) && ep.sourceLinks.length) ep.sourceLinks.forEach(s => s && s.url && links.push(mdLink(s.title || s.url, s.url)));
+    else if (ep.sourceUrl) links.push(mdLink('Read the original', ep.sourceUrl));
+    if (ep.videoUrl) links.push(mdLink('Watch', ep.videoUrl));
+    if (ep.audioUrl) links.push(mdLink('Listen', ep.audioUrl));
+    if (links.length) L.push(links.join(' · '), '');
+  }
+
+  if (x.related && x.related.length) L.push('## Related stories', '', ...x.related.map(n => x.vault ? `- [[${n}]]` : `- ${n}`), '');
+
+  if (x.articles && x.articles.length) {
+    L.push('## Saved articles', '');
+    for (const a of x.articles) {
+      const d = a.doc || {};
+      if (x.vault) L.push(`- [[${a.name}]]${d.site ? ' · ' + d.site : ''}`);
+      else {
+        L.push(`### ${d.title || a.name}`, '', [d.site, d.byline, d.publishedAt ? exportDay(d.publishedAt) : ''].filter(Boolean).join(' · ') + (d.url ? `${d.site || d.byline || d.publishedAt ? ' · ' : ''}${mdLink('source', d.url)}` : ''), '', demote(d.text), '');
+      }
+    }
+    if (x.vault) L.push('');
+  }
+
+  if (x.podcasts && x.podcasts.length) {
+    L.push('## Podcast episodes', '');
+    for (const p of x.podcasts) {
+      const it = p.item || {};
+      L.push(x.vault ? `### [[${p.name}]]` : `### ${it.title || p.name}${it.podcastTitle ? ' · ' + it.podcastTitle : ''}`, '');
+      const meta = [it.podcastTitle, it.date ? exportDay(it.date) : '', it.duration ? exportClock(it.duration) + ' long' : '', it.url ? mdLink('episode page', it.url) : '', it.audioUrl ? mdLink('audio', it.audioUrl) : ''].filter(Boolean);
+      if (meta.length) L.push(meta.join(' · '), '');
+      const secs = (p.sections && p.sections.sections) || [];
+      if (secs.length) {
+        L.push('**Key moments for this story:**', '');
+        for (const s of secs) L.push(`- **${exportClock(s.start)}–${exportClock(s.end)}**${s.why ? ' — ' + s.why : ''}`, `  > ${clipTxt(s.text, 420)}`);
+        L.push('');
+      } else L.push('_Transcribed, but key moments were not analysed for this story. Open the episode\'s Key moments in Lateral to do that._', '');
+      if (!x.vault && p.transcript) L.push(...transcriptLines(p.transcript), '');
+    }
+  }
+  return L.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+// A transcript as readable paragraphs: five segments each, led by the time of the first.
+function transcriptLines(doc) {
+  const segs = (doc && doc.segments) || [];
+  const out = ['**Transcript**', ''];
+  for (let i = 0; i < segs.length; i += 5) {
+    const chunk = segs.slice(i, i + 5);
+    out.push(`**[${exportClock(chunk[0].s)}]** ${chunk.map(c => c.t).join(' ')}`, '');
+  }
+  return out;
+}
+
+function articleNote(name, doc, storyNames) {
+  const d = doc || {};
+  const L = ['---', `title: ${yamlStr(d.title || name)}`, 'type: lateral-article', ...(d.url ? [`source: ${yamlStr(d.url)}`] : []), ...(d.site ? [`site: ${yamlStr(d.site)}`] : []),
+    ...(d.byline ? [`author: ${yamlStr(d.byline)}`] : []), ...(d.publishedAt ? [`published: ${yamlStr(exportDay(d.publishedAt))}`] : []), 'tags: ["lateral", "article"]', '---', '',
+    `# ${d.title || name}`, '', [d.site, d.byline, d.publishedAt ? exportDay(d.publishedAt) : ''].filter(Boolean).join(' · ') + (d.url ? `${d.site || d.byline || d.publishedAt ? ' · ' : ''}${mdLink('original', d.url)}` : ''), ''];
+  if (storyNames && storyNames.length) L.push(`From: ${storyNames.map(n => `[[${n}]]`).join(', ')}`, '');
+  L.push(demote(d.text), '');
+  return L.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+function podcastNote(name, item, transcript, storyNames) {
+  const it = item || {};
+  const L = ['---', `title: ${yamlStr(it.title || name)}`, 'type: lateral-podcast', ...(it.podcastTitle ? [`show: ${yamlStr(it.podcastTitle)}`] : []), ...(it.date ? [`date: ${yamlStr(exportDay(it.date))}`] : []),
+    ...(it.url ? [`source: ${yamlStr(it.url)}`] : []), 'tags: ["lateral", "podcast"]', '---', '', `# ${it.title || name}`, ''];
+  const meta = [it.podcastTitle, it.duration ? exportClock(it.duration) + ' long' : '', it.url ? mdLink('episode page', it.url) : '', it.audioUrl ? mdLink('audio', it.audioUrl) : ''].filter(Boolean);
+  if (meta.length) L.push(meta.join(' · '), '');
+  if (storyNames && storyNames.length) L.push(`From: ${storyNames.map(n => `[[${n}]]`).join(', ')}`, '');
+  if (transcript) L.push(...transcriptLines(transcript), '');
+  else L.push('_Transcript not included in this export._', '');
+  return L.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+}
+
+// data: { predMap, articles:{[storyId]:[{key,…}]}, docs:{[key]:doc}, podcasts:{[storyId]:[{item,sections,transcript}]}, library:[{key,…}] }
+// -> { files:[{name,text}] } for the vault, or { text } for the single file.
+function buildExport(picked, data, opts, format) {
+  const vault = format === 'vault';
+  const used = new Set(), storyName = {}, articleName = {}, podName = {};
+  for (const s of picked) storyName[s.id] = exportNoteName(storyTitleOf(s), used, 'Story');
+  const rel = relatedStories(picked);
+  const articleStories = {}, podStories = {};
+  const artFor = id => (opts.articles ? (data.articles[id] || []) : []);
+  const podFor = id => (opts.podcasts ? (data.podcasts[id] || []) : []);
+  for (const s of picked) {
+    for (const a of artFor(s.id)) if (data.docs[a.key]) { (articleStories[a.key] = articleStories[a.key] || []).push(storyName[s.id]); }
+    for (const p of podFor(s.id)) (podStories[p.item.key] = podStories[p.item.key] || []).push(storyName[s.id]);
+  }
+  const names = (map, key, title, fallback) => map[key] || (map[key] = exportNoteName(title, used, fallback));
+  const blocks = [];
+  const files = [];
+  for (const s of picked) {
+    const articles = artFor(s.id).filter(a => data.docs[a.key]).map(a => ({ name: names(articleName, a.key, data.docs[a.key].title || a.title, 'Article'), doc: data.docs[a.key] }));
+    const podcasts = podFor(s.id).map(p => ({ name: names(podName, p.item.key, p.item.title, 'Podcast'), item: p.item, sections: p.sections, transcript: opts.transcripts ? p.transcript : null, transcribed: true }));
+    const md = storyMarkdown(s, { vault, pred: data.predMap[s.id], articles, podcasts, related: (rel[s.id] || []).map(id => storyName[id]), opts });
+    if (vault) files.push({ name: `Lateral/Stories/${storyName[s.id]}.md`, text: md });
+    else blocks.push(md);
+  }
+  const seenArticle = new Set(), seenPod = new Set();
+  const libraryItems = opts.articles && opts.library ? (data.library || []).filter(a => data.docs[a.key] && !articleStories[a.key]) : [];
+  if (vault) {
+    for (const key of Object.keys(articleStories)) if (!seenArticle.has(key)) { seenArticle.add(key); files.push({ name: `Lateral/Articles/${articleName[key]}.md`, text: articleNote(articleName[key], data.docs[key], articleStories[key]) }); }
+    for (const a of libraryItems) { const n = names(articleName, a.key, data.docs[a.key].title || a.title, 'Article'); files.push({ name: `Lateral/Library/${n}.md`, text: articleNote(n, data.docs[a.key], []) }); }
+    for (const s of picked) for (const p of podFor(s.id)) { const key = p.item.key; if (seenPod.has(key)) continue; seenPod.add(key); files.push({ name: `Lateral/Podcasts/${podName[key]}.md`, text: podcastNote(podName[key], p.item, opts.transcripts ? p.transcript : null, podStories[key]) }); }
+    const day = new Date().toISOString().slice(0, 10);
+    files.unshift({ name: 'Lateral/Lateral Index.md', text: ['---', 'type: lateral-index', `exported: ${yamlStr(day)}`, 'tags: ["lateral"]', '---', '', '# Lateral export', '', `Exported ${day}: ${picked.length} stor${picked.length === 1 ? 'y' : 'ies'}.`, '', '## Stories', '',
+      ...picked.map(s => `- [[${storyName[s.id]}]]${s.summary ? ' — ' + clipTxt(s.summary, 140) : ''}`), ''].join('\n') });
+    return { files };
+  }
+  if (libraryItems.length) {
+    blocks.push(['# Library: other saved articles', '', ...libraryItems.flatMap(a => { const d = data.docs[a.key]; return [`## ${d.title || a.title || 'Article'}`, '', [d.site, d.byline, d.publishedAt ? exportDay(d.publishedAt) : ''].filter(Boolean).join(' · ') + (d.url ? ` · ${mdLink('source', d.url)}` : ''), '', demote(d.text), '']; })].join('\n').replace(/\n{3,}/g, '\n\n') + '\n');
+  }
+  const head = `<!-- Exported from Lateral on ${new Date().toISOString().slice(0, 10)}: ${picked.length} stor${picked.length === 1 ? 'y' : 'ies'} -->\n\n`;
+  return { text: head + blocks.join('\n\n---\n\n') };
+}
+// </export-pure>
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// Gathers what the chosen options need from the server. Anything that cannot be fetched is skipped, never fatal.
+async function collectExportData(picked, opts, say) {
+  const data = { predMap: {}, articles: {}, docs: {}, podcasts: {}, library: [], counts: { articles: 0, episodes: 0 } };
+  const getJ = async url => { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; } };
+  say('Reading predictions…');
+  data.predMap = await fetchPredictionShareData(picked).catch(() => ({}));
+  if (opts.articles) {
+    say('Reading saved articles…');
+    for (const s of picked) data.articles[s.id] = ((await getJ(`/api/lateral/archive/list?storyId=${encodeURIComponent(s.id)}&limit=300`)) || {}).items || [];
+    let keys = [...new Set(Object.values(data.articles).flat().map(a => a.key))];
+    if (opts.library) {
+      data.library = ((await getJ('/api/lateral/archive/list?limit=500')) || {}).items || [];
+      keys = [...new Set([...keys, ...data.library.map(a => a.key)])];
+    }
+    let done = 0;
+    const queue = keys.slice();
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      while (queue.length) {
+        const key = queue.shift();
+        const doc = await getJ(`/api/lateral/archive/get?key=${encodeURIComponent(key)}`);
+        if (doc && doc.text) data.docs[key] = doc;
+        say(`Reading saved articles… ${++done}/${keys.length}`);
+      }
+    }));
+    data.counts.articles = Object.keys(data.docs).length;
+  }
+  if (opts.podcasts) {
+    say('Reading podcast transcripts…');
+    for (const s of picked) {
+      const list = ((await getJ(`/api/lateral/podcast/list?storyId=${encodeURIComponent(s.id)}`)) || {}).items || [];
+      const topic = encodeURIComponent(storyRelevanceCtx(s).topic);
+      data.podcasts[s.id] = [];
+      for (const item of list) {
+        const sections = await getJ(`/api/lateral/podcast/sections?key=${item.key}&topic=${topic}`);
+        const transcript = opts.transcripts ? await getJ(`/api/lateral/podcast/transcript?key=${item.key}`) : null;
+        data.podcasts[s.id].push({ item, sections: sections && sections.state === 'done' ? sections : null, transcript });
+        data.counts.episodes++;
+      }
+    }
+  }
+  return data;
+}
+
+function ExportModal({ stories, onClose }) {
+  const candidates = (stories || []).filter(s => (s.episodes || []).length > 0);
+  const [selected, setSelected] = useState(() => new Set(candidates.map(s => s.id)));
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('lateral-export-v1') || '{}'); } catch { return {}; } })();
+  const [format, setFormat] = useState(['pdf', 'md', 'vault'].includes(saved.format) ? saved.format : 'pdf');
+  const [opts, setOpts] = useState({ articles: !!saved.articles, podcasts: !!saved.podcasts, transcripts: !!saved.transcripts, library: !!saved.library });
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  useEffect(() => { try { localStorage.setItem('lateral-export-v1', JSON.stringify({ format, ...opts })); } catch {} }, [format, opts]);
+
+  const toggle = id => setSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const setOpt = (k, v) => setOpts(o => ({ ...o, [k]: v, ...(k === 'podcasts' && !v ? { transcripts: false } : {}), ...(k === 'articles' && !v ? { library: false } : {}) }));
+  const picked = candidates.filter(s => selected.has(s.id));
+  const fmt = EXPORT_FORMATS.find(f => f.id === format);
+
+  async function runPdf() {
+    // Open the tab inside the click (pop-up blockers), then fetch prediction evidence before building the page.
+    const win = window.open('', '_blank');
+    if (!win) throw new Error('Pop-up blocked. Allow pop-ups and try again.');
+    try {
+      const predMap = await fetchPredictionShareData(picked);
+      const url = URL.createObjectURL(new Blob([buildMultiStoryShareHtml(picked, predMap)], { type: 'text/html' }));
+      win.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (e) { try { win.close(); } catch {} throw e; }
+    return `✓ Opened ${picked.length} stor${picked.length === 1 ? 'y' : 'ies'} in a new tab. Click Download PDF there.`;
+  }
+  async function runFile() {
+    const data = await collectExportData(picked, opts, setStatus);
+    setStatus('Building…');
+    const built = buildExport(picked, data, opts, format);
+    const base = picked.length === 1 ? safeFileToken(storyTitleOf(picked[0]), 'story') : `lateral-export-${new Date().toISOString().slice(0, 10)}`;
+    if (format === 'vault') downloadBlob(makeZip(built.files), `${base}.zip`);
+    else downloadBlob(new Blob([built.text], { type: 'text/markdown;charset=utf-8' }), `${base}.md`);
+    const extra = [data.counts.articles ? `${data.counts.articles} saved article${data.counts.articles === 1 ? '' : 's'}` : '', data.counts.episodes ? `${data.counts.episodes} podcast episode${data.counts.episodes === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+    return `✓ Saved ${format === 'vault' ? `${built.files.length} notes` : 'one Markdown file'} for ${picked.length} stor${picked.length === 1 ? 'y' : 'ies'}${extra ? ' with ' + extra : ''}.`;
+  }
+  async function runExport() {
+    if (!picked.length || busy) return;
+    setBusy(true); setStatus(format === 'pdf' ? 'Building PDF…' : 'Gathering…');
+    try { setStatus(format === 'pdf' ? await runPdf() : await runFile()); }
+    catch (e) { setStatus(`Failed: ${e.message || 'export failed'}`); }
+    finally { setBusy(false); }
+  }
+
+  const sectionHead = { fontSize: 10, fontWeight: 800, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '12px 0 6px' };
+  const check = (label, key, hintText, disabled) => (
+    <label style={{display:'flex',alignItems:'flex-start',gap:9,fontSize:12.5,color:disabled ? C.textMute : C.textMid,lineHeight:1.45,cursor:disabled ? 'default' : 'pointer',padding:'3px 0',opacity:disabled ? 0.55 : 1}}>
+      <input type="checkbox" checked={!!opts[key] && !disabled} disabled={disabled} onChange={e => setOpt(key, e.target.checked)} style={{marginTop:3}}/>
+      <span>{label}{hintText && <span style={{display:'block',fontSize:11.5,color:C.textMute}}>{hintText}</span>}</span>
+    </label>
+  );
   return (
-    <Modal title="Export to NotebookLM" onClose={onClose} maxWidth={720}>
-      <div style={{fontSize:12,color:C.textMute,marginBottom:10}}>
-        Select tracked stories to include. Opens a print-ready page in a new tab — click Download PDF there. PDF is what NotebookLM actually accepts as a source.
+    <Modal title="Export" onClose={onClose} maxWidth={720}>
+      <div style={{...sectionHead,marginTop:0}}>1 · What to export</div>
+      <div style={{display:'flex',gap:8,marginBottom:8}}>
+        <Btn variant="ghost" onClick={() => setSelected(new Set(candidates.map(s => s.id)))} style={{padding:'6px 10px',fontSize:11.5}}>Select all</Btn>
+        <Btn variant="ghost" onClick={() => setSelected(new Set())} style={{padding:'6px 10px',fontSize:11.5}}>Clear</Btn>
+        <span style={{marginLeft:'auto',alignSelf:'center',fontSize:11.5,color:C.textMute}}>{picked.length} of {candidates.length} selected</span>
       </div>
-      <div style={{display:'flex',gap:8,marginBottom:10}}>
-        <Btn variant="ghost" onClick={selectAll} style={{padding:'6px 10px',fontSize:11.5}}>Select All</Btn>
-        <Btn variant="ghost" onClick={clearAll} style={{padding:'6px 10px',fontSize:11.5}}>Clear</Btn>
-      </div>
-      <div style={{border:`1px solid ${C.border}`,borderRadius:10,maxHeight:360,overflowY:'auto',padding:8,marginBottom:12}}>
+      <div style={{border:`1px solid ${C.border}`,borderRadius:10,maxHeight:230,overflowY:'auto',padding:6}}>
         {candidates.length === 0 ? (
           <div style={{fontSize:12,color:C.textMute,padding:10}}>No tracked stories with episodes yet.</div>
         ) : candidates.map(s => {
           const on = selected.has(s.id);
           return (
-            <label key={s.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'9px 8px',borderRadius:8,cursor:'pointer',background:on?`${C.borderLight}`:'transparent'}}>
-              <input type="checkbox" checked={on} onChange={()=>toggle(s.id)} style={{marginTop:2}} />
+            <label key={s.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'7px 8px',borderRadius:8,cursor:'pointer',background:on ? C.borderLight : 'transparent'}}>
+              <input type="checkbox" checked={on} onChange={() => toggle(s.id)} style={{marginTop:2}}/>
               <div style={{minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.title}</div>
-                <div style={{fontSize:11.5,color:C.textMute}}>
-                  {(s.episodes||[]).length} episode{(s.episodes||[]).length===1?'':'s'} · updated {fmtS(s.updatedAt || s.createdAt)}
-                </div>
+                <div style={{fontSize:13,fontWeight:700,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{storyTitleOf(s)}</div>
+                <div style={{fontSize:11.5,color:C.textMute}}>{s.predictionId ? 'Prediction · ' : ''}{(s.episodes || []).length} episode{(s.episodes || []).length === 1 ? '' : 's'} · updated {fmtS(s.updatedAt || s.createdAt)}</div>
               </div>
             </label>
           );
         })}
       </div>
-      <div style={{display:'flex',gap:8}}>
+
+      <div style={sectionHead}>2 · Format</div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {EXPORT_FORMATS.map(f => (
+          <button key={f.id} onClick={() => setFormat(f.id)} aria-pressed={format === f.id}
+            style={{flex:'1 1 150px',textAlign:'left',padding:'9px 11px',borderRadius:9,cursor:'pointer',background:format === f.id ? C.accent + '14' : C.surface,border:`1.5px solid ${format === f.id ? C.accent : C.border}`}}>
+            <div style={{fontSize:13,fontWeight:800,color:format === f.id ? C.accent : C.text}}>{f.label}</div>
+          </button>
+        ))}
+      </div>
+      <div style={{fontSize:11.5,color:C.textMute,lineHeight:1.5,margin:'6px 2px 0'}}>{fmt.hint}</div>
+
+      <div style={sectionHead}>3 · Include</div>
+      {format === 'pdf'
+        ? <div style={{fontSize:12,color:C.textMute,lineHeight:1.55}}>Each story's timeline, and for predictions the claim, evidence balance and every scored article. Choose Markdown or Obsidian to add saved article text and podcast transcripts.</div>
+        : (
+          <>
+            <div style={{fontSize:12,color:C.textMid,marginBottom:2}}>Always: each story's summary, timeline and links, and for predictions the claim and evidence.</div>
+            {check('Saved article text', 'articles', 'The full text Lateral saved for articles linked to these stories (see the Library).')}
+            {check('The rest of my Library', 'library', 'Also include saved articles that are not linked to the selected stories.', !opts.articles)}
+            {check('Podcast key moments', 'podcasts', 'For episodes you transcribed: the passages about each story, with timestamps.')}
+            {check('Full podcast transcripts', 'transcripts', 'The whole transcript of each episode (can be long).', !opts.podcasts)}
+          </>
+        )}
+
+      <div style={{display:'flex',gap:8,marginTop:14}}>
         <Btn variant="ghost" onClick={onClose} style={{flex:1}}>Cancel</Btn>
-        <Btn onClick={runExport} disabled={!selected.size || busy || !candidates.length} style={{flex:1}}>
-          {busy ? 'Exporting…' : `Export ${selected.size} stor${selected.size===1?'y':'ies'}`}
+        <Btn onClick={runExport} disabled={!picked.length || busy || !candidates.length} style={{flex:1}}>
+          {busy ? 'Exporting…' : `Export ${picked.length} stor${picked.length === 1 ? 'y' : 'ies'} as ${format === 'pdf' ? 'PDF' : format === 'md' ? 'Markdown' : 'Obsidian vault'}`}
         </Btn>
       </div>
       <StatusLine msg={status}/>
@@ -11787,7 +12768,7 @@ function isSuspiciousArticleImageDimensions(imgEl) {
   return false;
 }
 
-function ArticleCard({ article, compact = false, feature = false, hideMedia = false, onTrack, onAddEp }) {
+function ArticleCard({ article, compact = false, feature = false, hideMedia = false, onTrack, onAddEp, also }) {
   const [imgSrc,  setImgSrc]  = React.useState(article.imageUrl || null);
   const [imgErr,  setImgErr]  = React.useState(false);
   const [favErr,  setFavErr]  = React.useState(false);
@@ -11924,6 +12905,7 @@ function ArticleCard({ article, compact = false, feature = false, hideMedia = fa
           {sourceLabel && article.date && <span>·</span>}
           {article.date && <span style={{whiteSpace:'nowrap'}}>{fmtS(article.date)}</span>}
         </div>
+        {also && also.length > 0 && <AlsoCovered also={also}/>}
         {civicItemOf(article) && (
           <button
             onClick={e => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('lateral-track-bill', { detail: civicItemOf(article) })); }}
@@ -12128,8 +13110,8 @@ function PredictionsPanel() {
   }
 
   const activePred = predictions.find(p => p.id === selectedPred);
-  const supports = links.filter(l => l.stance === 'supports').sort((a,b) => b.weight - a.weight);
-  const contradicts = links.filter(l => l.stance === 'contradicts').sort((a,b) => b.weight - a.weight);
+  const supports = links.filter(l => l.stance === 'supports' && !(l.group && l.group.echo)).sort((a,b) => b.weight - a.weight);
+  const contradicts = links.filter(l => l.stance === 'contradicts' && !(l.group && l.group.echo)).sort((a,b) => b.weight - a.weight);
 
   return (
     <div style={{padding:'24px 32px',maxWidth:900,margin:'0 auto',overflowY:'auto',height:'100%'}}>
@@ -12671,9 +13653,9 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
             )}
             {searchRes.length > 0 && (
               <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:10}}>
-                {searchRes.map((a, i) => (
-                  <ArticleCard key={i} article={a} onAddEp={onStartStory ? (art) => onStartStory(art) : undefined}/>
-                ))}
+                <GroupedCards articles={searchRes} render={(a, also, i) => (
+                  <ArticleCard key={a.url || i} article={a} also={also} onAddEp={onStartStory ? (art) => onStartStory(art) : undefined}/>
+                )}/>
               </div>
             )}
           </div>
@@ -12767,9 +13749,9 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                         <span style={{fontFamily:'Playfair Display, Georgia, serif', fontSize:15, fontWeight:600, color:C.textMid, letterSpacing:'0.02em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{s.title}</span>
                       </div>
                       <div style={HOME_GRID_4_COL}>
-                        {items.map((a, i) => (
-                          <ArticleCard key={i} article={a} onAddEp={onAddEpisode ? (art) => onAddEpisode(art, s.id) : undefined}/>
-                        ))}
+                        <GroupedCards articles={items} render={(a, also, i) => (
+                          <ArticleCard key={a.url || i} article={a} also={also} onAddEp={onAddEpisode ? (art) => onAddEpisode(art, s.id) : undefined}/>
+                        )}/>
                       </div>
                     </div>
                   );
@@ -12804,9 +13786,9 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                   </SectionToggleButton>
                   {discOpen[cat.key] && (
                     <div style={HOME_GRID_4_COL}>
-                      {disc[cat.key].map((a, i) => (
-                        <ArticleCard key={i} article={a} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
-                      ))}
+                      <GroupedCards articles={disc[cat.key]} render={(a, also, i) => (
+                        <ArticleCard key={a.url || i} article={a} also={also} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
+                      )}/>
                     </div>
                   )}
                 </div>
@@ -12821,9 +13803,9 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                 </SectionToggleButton>
                 {discOpen.local && (
                   <div style={HOME_GRID_4_COL}>
-                    {disc.local.map((a, i) => (
-                      <ArticleCard key={i} article={a} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
-                    ))}
+                    <GroupedCards articles={disc.local} render={(a, also, i) => (
+                      <ArticleCard key={a.url || i} article={a} also={also} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
+                    )}/>
                   </div>
                 )}
               </div>
@@ -14568,7 +15550,7 @@ function App() {
           {!isMobile && storiesView.some(s=>s.episodes?.length>0) && (
             <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginRight:8}}>
               <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
-                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('notebooklm')}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
                 onMap={()=>setModal('map')}/>
             </div>
           )}
@@ -14594,7 +15576,7 @@ function App() {
           <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:4}}>
             {storiesView.some(s=>s.episodes?.length>0) && (
               <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
-                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('notebooklm')}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
                 onMap={()=>setModal('map')}/>
             )}
           </div>
@@ -14706,7 +15688,7 @@ function App() {
         </Modal>
       )}
       {modal==='brief'      && <BriefModal stories={storiesView} settings={settings} onClose={()=>setModal(null)}/>}
-      {NOTEBOOKLM_EXPORT_ENABLED && modal==='notebooklm' && <NotebookLMExportModal stories={storiesView} onClose={()=>setModal(null)}/>}
+      {NOTEBOOKLM_EXPORT_ENABLED && modal==='export' && <ExportModal stories={storiesView} onClose={()=>setModal(null)}/>}
       {modal==='map'        && <SpiderMapModal stories={storiesView} onClose={()=>setModal(null)} onSelectStory={id=>{setSelStory(id);setSelEp(null);setHomeView(false);setModal(null);}}/>}
       <FloatingAudioPlayer player={floatingPlayer} onClose={() => setFloatingPlayer(null)}/>
     </div>

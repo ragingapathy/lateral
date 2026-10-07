@@ -360,6 +360,8 @@ const archive = require('./archive');
 const alerts = require('./alerts');
 const feeds = require('./feeds');
 const civic = require('./civic');
+const podcasts = require('./podcasts');
+const dedupe = require('./dedupe');
 const civicWatch = require('./civic-watch');
 
 // ─── HTTP request helper ─────────────────────────────────────────────────────────────────
@@ -4328,6 +4330,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname.startsWith('/civic/') || pathname.startsWith('/api/lateral/civic/')) {
     if (await civic.route(req, reqUrl, res, send) !== false) return;
+  }
+  if (pathname.startsWith('/podcast/') || pathname.startsWith('/api/lateral/podcast/')) {
+    if (await podcasts.route(req, reqUrl, res, send) !== false) return;
+  }
+  if (pathname.startsWith('/dedupe/') || pathname.startsWith('/api/lateral/dedupe/')) {
+    if (await dedupe.route(req, reqUrl, res, send) !== false) return;
   }
   if (isBackup  && req.method === 'GET')  return ops.handleBackup(res, opsCtx);
   if (isRestore && req.method === 'POST') return ops.handleRestore(req, res, opsCtx);

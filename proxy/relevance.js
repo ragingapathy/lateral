@@ -228,4 +228,4 @@ function setOverride(topic, url, verdict = 'on_topic') {
   return true;
 }
 
-module.exports = { checkArticles, setOverride, normalizeVerdict };
+module.exports = { checkArticles, setOverride, normalizeVerdict, ollamaText };

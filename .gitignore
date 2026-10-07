@@ -43,3 +43,7 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+
+tools/.venv/
+tools/__pycache__/
+tools/worker.log

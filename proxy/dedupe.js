@@ -236,4 +236,68 @@ function stats() {
   return { pairs: Object.keys(verdicts.pairs).length, same: Object.values(verdicts.pairs).filter(v => v.v === 'same').length, embeddings: Object.keys(vecs.v).length, embedModel: EMBED_MODEL, embeddingsAvailable: Date.now() >= embedDownUntil };
 }
 
-module.exports = { groupEntries, clustersFor, stats, cleanTitle, tokens };
+// ─── Headline lists (the Home feed and a story's Latest Headlines) ───────────
+
+// POST /dedupe/headlines { articles:[{ url, title, source?, text? }], judge? }
+//   -> { groups:[{ gid, members:[url…] }], pending }
+// Groups come from verdicts already cached, so the answer is instant. With judge:true, any uncached candidate pairs are judged
+// in the background (once per set of articles per 10 minutes) and `pending` says to ask again in a few seconds.
+const idOf = url => crypto.createHash('sha1').update(String(url)).digest('hex').slice(0, 16);
+const listRuns = new Map();      // set-key -> { state, at }
+const LIST_MAX = 80;
+
+function headlineGroups(articles, judge) {
+  const seen = new Set();
+  const entries = [];
+  for (const a of Array.isArray(articles) ? articles : []) {
+    const url = String(a && a.url || '');
+    if (!/^https?:\/\//i.test(url) || !a.title || seen.has(url)) continue;
+    seen.add(url);
+    entries.push({ id: idOf(url), url, title: String(a.title), text: String(a.text || '').slice(0, 320), source: String(a.source || '').slice(0, 60) });
+    if (entries.length >= LIST_MAX) break;
+  }
+  const urlOf = new Map(entries.map(e => [e.id, e.url]));
+  const clusters = clustersFor(entries.map(e => e.id));
+  const groups = [];
+  const done = new Set();
+  for (const [, c] of clusters) {
+    if (done.has(c.gid)) continue;
+    done.add(c.gid);
+    groups.push({ gid: c.gid, members: c.members.map(id => urlOf.get(id)).filter(Boolean) });
+  }
+  let pending = false;
+  if (judge && entries.length >= 2) {
+    const key = idOf(entries.map(e => e.id).sort().join(','));
+    const run = listRuns.get(key);
+    if (run && run.state === 'running') pending = true;
+    else if (!run || Date.now() - run.at > 10 * 60 * 1000) {
+      if (listRuns.size > 300) listRuns.clear();
+      listRuns.set(key, { state: 'running', at: Date.now() });
+      groupEntries(entries).catch(() => {}).then(() => { listRuns.set(key, { state: 'done', at: Date.now() }); });
+      pending = true;
+    }
+  }
+  return { groups, pending };
+}
+
+function readBody(req, max = 1024 * 1024) {
+  return new Promise((resolve) => {
+    const chunks = []; let n = 0;
+    req.on('data', c => { n += c.length; if (n <= max) chunks.push(c); });
+    req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch { resolve({}); } });
+    req.on('error', () => resolve({}));
+  });
+}
+
+async function route(req, reqUrl, res, send) {
+  const p = reqUrl.pathname.replace(/^\/api\/lateral/, '');
+  if (!p.startsWith('/dedupe/')) return false;
+  if (p === '/dedupe/stats' && req.method === 'GET') return send(res, 200, stats());
+  if (p === '/dedupe/headlines' && req.method === 'POST') {
+    const body = await readBody(req);
+    return send(res, 200, headlineGroups(body.articles, body.judge !== false));
+  }
+  return send(res, 404, { error: 'Unknown dedupe route.' });
+}
+
+module.exports = { groupEntries, clustersFor, stats, cleanTitle, tokens, headlineGroups, route };

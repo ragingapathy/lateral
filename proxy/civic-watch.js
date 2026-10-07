@@ -34,6 +34,7 @@ const MAX_TOPICS = 5;
 const HOUR = 3600000;
 
 const civic = () => require('./civic');
+const boards = () => require('./civic-boards');
 // Test hook: stand-ins for the network.
 let ctx = {};
 const getJson = (url, opts) => (ctx.getJson || civic().getJson)(url, opts);
@@ -219,18 +220,28 @@ async function fetchRules(topics) {
   return { name: 'Federal Register', items: out };
 }
 
+// "Metropolitan King County Council (Legistar)" is "Metropolitan King County Council" as a story title.
+const boardName = b => String(b.label || '').replace(/\s*\((Legistar|Granicus)\)$/, '');
+
+async function fetchBoard(id) {
+  const b = boards().get(id);
+  if (!b) throw new Error('That board was removed.');
+  return boards().fetchItems(b);
+}
+
 const TTL = { council: 30 * 60000, delegation: 6 * HOUR, state: 3 * HOUR, rules: 3 * HOUR };
 
 // Fetch (or reuse) one watch's items. Falls back to the last good copy when a source is down or rate-limited.
 async function fetchKind(kind, { fresh = false } = {}) {
   const profile = civic().profile();
   if (!profile) throw new Error('No Civic profile yet.');
-  const ttl = kind === 'delegation' && keyFor('congress') ? 2 * HOUR : TTL[kind];
+  const ttl = kind === 'delegation' && keyFor('congress') ? 2 * HOUR : (TTL[kind] || 30 * 60000);
   const hit = db.cache[kind];
   if (hit && !fresh && Date.now() - hit.at < ttl) return { ...hit, cached: true };
   try {
     const r = kind === 'council' ? await fetchCouncil(profile) : kind === 'delegation' ? await fetchDelegation(profile)
-      : kind === 'state' ? await fetchState(profile) : kind === 'rules' ? await fetchRules(db.topics) : null;
+      : kind === 'state' ? await fetchState(profile) : kind === 'rules' ? await fetchRules(db.topics)
+      : kind.startsWith('board:') ? await fetchBoard(kind.slice(6)) : null;
     if (!r) throw new Error('Unknown watch.');
     db.cache[kind] = { at: Date.now(), name: r.name, items: r.items };
     saveSoon();
@@ -276,6 +287,17 @@ function definitions(profile) {
     available: true, needsTopics: !(db.topics && db.topics.length), topics: db.topics.slice(), tags: ['civic', 'federal rules', ...db.topics.slice(0, 3)], actors: [],
     summary: `Follows federal proposed and final rules about ${db.topics.join(', ') || 'your chosen topics'}, with public-comment deadlines, from the Federal Register, plus news. Part of your Civic profile.`,
   });
+  // Boards you added on the Civic page (a county board, a school board, a Granicus city, any feed): one watch each.
+  for (const b of boards().list()) {
+    const what = { legistar: 'its Legistar site', granicus: 'its Granicus meetings page', feed: 'its feed' }[b.kind] || 'its site';
+    defs.push({
+      id: 'board:' + b.id, title: boardName(b),
+      blurb: ({ legistar: 'Upcoming meetings and legislation, read from its Legistar site.', granicus: 'Meetings and agendas, read from its Granicus page.', feed: 'New items from its feed.' })[b.kind] || '',
+      available: true, tags: ['civic', 'local government', b.scope === 'school' ? 'school board' : b.scope === 'county' ? 'county government' : null, place].filter(Boolean), actors: [],
+      summary: `Tracks ${boardName(b)}: new meetings, agendas and items, read from ${what}, plus local news. Part of your Civic profile.`,
+      isBoard: true, boardKind: b.kind, boardScope: b.scope,
+    });
+  }
   return defs;
 }
 
@@ -296,7 +318,7 @@ function list() {
 // ─── Linking ─────────────────────────────────────────────────────────────────
 
 function link(kind, storyId, topics) {
-  if (!['council', 'delegation', 'state', 'rules'].includes(kind)) throw new Error('Unknown watch.');
+  if (!['council', 'delegation', 'state', 'rules'].includes(kind) && !(kind.startsWith('board:') && boards().get(kind.slice(6)))) throw new Error('Unknown watch.');
   if (!storyId) throw new Error('A story is required.');
   if (kind === 'rules' && Array.isArray(topics)) setTopics(topics);
   db.watches[kind] = { storyId: String(storyId), at: new Date().toISOString() };
@@ -305,6 +327,8 @@ function link(kind, storyId, topics) {
   return list();
 }
 function unlink(kind) { delete db.watches[kind]; delete db.seen[kind]; saveSoon(); return list(); }
+// A board was removed: forget its watch, what it had reported and its cached items.
+function forget(kind) { delete db.watches[kind]; delete db.seen[kind]; delete db.cache[kind]; saveSoon(); }
 function setTopics(topics) {
   const clean = [...new Set((Array.isArray(topics) ? topics : String(topics || '').split(',')).map(t => String(t).replace(/\s+/g, ' ').trim()).filter(t => t.length >= 2 && t.length <= 60))].slice(0, MAX_TOPICS);
   db.topics = clean;
@@ -444,7 +468,7 @@ async function route(req, reqUrl, res, send) {
 }
 
 module.exports = {
-  route, list, link, unlink, collect, hasWatch, itemsForStory, fetchKind, keyStatus, keyFor,
+  route, list, link, unlink, forget, collect, hasWatch, itemsForStory, fetchKind, keyStatus, keyFor,
   init: c => { ctx = { ...ctx, ...(c || {}) }; },
   // for tests
   matterItem, eventItem, billItem, stateBillItem, ruleItem, toArticle, definitions, setTopics, setKey, MILESTONE,

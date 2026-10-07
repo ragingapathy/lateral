@@ -45,6 +45,9 @@ services:
       - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
       - OPENAI_COMPAT_API_KEY=${OPENAI_COMPAT_API_KEY:-}
       - OPENAI_COMPAT_BASE_URL=${OPENAI_COMPAT_BASE_URL:-https://api.openai.com/v1}
+      # Optional podcast transcription helper (python tools/transcribe_worker.py on the host); see the README.
+      - LATERAL_TRANSCRIBE_URL=${LATERAL_TRANSCRIBE_URL:-http://host.docker.internal:3007}
+      - LATERAL_TRANSCRIBE_TOKEN=${LATERAL_TRANSCRIBE_TOKEN:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

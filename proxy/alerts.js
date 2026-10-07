@@ -8,7 +8,9 @@
 //     system            something Lateral depends on stopped working (or recovered)
 //     tavily            search credits are running low
 //
-//   Delivery (optional): ntfy, Discord, Slack, or any webhook, as a daily digest and/or instantly for the events that matter.
+//   Delivery (optional): ntfy, Discord, Slack, email (SMTP) or any webhook, as a daily digest and/or instantly for the events that matter.
+//   Quiet hours hold instant messages until the window ends, then send ONE catch-up. A muted story still lists its events in the
+//   inbox (dimmed, already read) but never sends them and keeps them out of the digest.
 //
 //   GET  /alerts/config · POST /alerts/config      read / change settings (secrets are masked on the way out)
 //   GET  /alerts/events · /alerts/unread           the inbox
@@ -16,12 +18,15 @@
 //   POST /alerts/test {channelId}                  send a test message
 //   POST /alerts/digest {preview?}                 build (and send) the digest now
 //   POST /alerts/watch                             run the prediction watcher now
+//   POST /alerts/mute {storyId, hours?} · /alerts/unmute {storyId}   silence one story (hours 0 or missing = until you unmute)
 //   GET  /alerts/status
 
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const net = require('net');
+const tls = require('tls');
 const crypto = require('crypto');
 
 const DATA_DIR = process.env.LATERAL_DATA_DIR || '/data';
@@ -39,6 +44,8 @@ function defaults() {
     config: {
       channels: [],
       digest: { enabled: true, time: '08:00', tzOffsetMin: 0 },
+      quiet: { enabled: false, from: '22:00', to: '07:00', allowImportant: false },
+      muted: {},
       instant: { predictionMoves: true, resolutionDue: true, system: true, tavilyUsage: true, civic: true },
       sensitivity: { scoreDelta: 20 },
       watch: { hours: 0 },
@@ -113,9 +120,89 @@ function post(urlStr, bodyObj, headers = {}, timeout = 10000) {
   });
 }
 
+// Minimal SMTP client (no dependencies): implicit TLS (465), STARTTLS (587) or plain (a local relay), AUTH PLAIN/LOGIN.
+function smtpSend(cfg, { subject, text }) {
+  const TIMEOUT = 20000;
+  const port = Number(cfg.port) || (cfg.secure === 'tls' ? 465 : cfg.secure === 'none' ? 25 : 587);
+  const tlsOpts = { host: cfg.host, rejectUnauthorized: !cfg.allowSelfSigned };
+  if (!net.isIP(cfg.host)) tlsOpts.servername = cfg.host;   // TLS refuses an IP address as a server name
+  const to = String(cfg.to || '').split(/[,;\s]+/).filter(Boolean);
+  const from = String(cfg.from || cfg.user || '').trim();
+  if (!cfg.host || !to.length || !from) return Promise.reject(new Error('Email needs a server, a from address and a to address'));
+  const addr = a => (String(a).match(/<([^>]+)>/) || [null, a])[1].trim();
+  const b64 = x => Buffer.from(x, 'utf8').toString('base64');
+  const mime = x => /^[\x20-\x7e]*$/.test(x) ? x : `=?UTF-8?B?${b64(x)}?=`;
+  const message = [
+    `From: ${from.includes('<') ? from : `Lateral <${from}>`}`, `To: ${to.join(', ')}`, `Subject: ${mime(String(subject).replace(/[\r\n]+/g, ' '))}`,
+    `Date: ${new Date().toUTCString()}`, `Message-ID: <${uid()}@lateral.local>`, 'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: base64', '', (b64(text).match(/.{1,76}/g) || []).join('\r\n'),
+  ].join('\r\n');
+
+  return new Promise((resolve, reject) => {
+    let sock, buf = '', done = false, waiter = null;
+    const fail = e => { if (done) return; done = true; try { sock && sock.destroy(); } catch {} reject(e instanceof Error ? e : new Error(String(e))); };
+    const timer = setTimeout(() => fail(new Error('timed out')), TIMEOUT);
+    const bind = s => {
+      sock = s; s.setEncoding('utf8');
+      s.on('data', d => { buf += d; pump(); });
+      s.on('error', e => fail(new Error(e.code || e.message)));
+      s.on('close', () => { if (!done && waiter) fail(new Error('connection closed')); });
+    };
+    // A reply is complete at a line like "250 text" (a space after the code); "250-text" continues it.
+    function pump() {
+      const lines = buf.split('\r\n');
+      for (let i = 0; i < lines.length - 1; i++) {
+        if (/^\d{3} /.test(lines[i]) || /^\d{3}$/.test(lines[i])) {
+          const reply = lines.slice(0, i + 1);
+          buf = lines.slice(i + 1).join('\r\n');
+          const w = waiter; waiter = null;
+          if (w) w({ code: Number(reply[reply.length - 1].slice(0, 3)), text: reply.join('\n') });
+          return pump();
+        }
+      }
+    }
+    const reply = () => new Promise(res => { waiter = res; pump(); });
+    const cmd = async (line, ok) => {
+      if (line !== null) sock.write(line + '\r\n');
+      const r = await reply();
+      if (!ok.includes(r.code)) throw new Error(`SMTP ${r.code}: ${clip(r.text.replace(/\n/g, ' '), 100)}`);
+      return r;
+    };
+    (async () => {
+      await new Promise((res, rej) => {
+        const s = cfg.secure === 'tls' ? tls.connect(port, cfg.host, tlsOpts, res) : net.connect(port, cfg.host, res);
+        s.once('error', e => rej(new Error(e.code || e.message)));
+        bind(s);
+      });
+      await cmd(null, [220]);
+      let hello = await cmd('EHLO lateral.local', [250]);
+      if (cfg.secure === 'starttls') {
+        await cmd('STARTTLS', [220]);
+        const plain = sock; plain.removeAllListeners('data'); plain.removeAllListeners('close');
+        await new Promise((res, rej) => { const s = tls.connect({ ...tlsOpts, socket: plain }, res); s.once('error', e => rej(new Error(e.code || e.message))); buf = ''; bind(s); });
+        hello = await cmd('EHLO lateral.local', [250]);
+      }
+      if (cfg.user) {
+        if (/AUTH[^\n]*PLAIN/i.test(hello.text) || !/AUTH[^\n]*LOGIN/i.test(hello.text)) await cmd('AUTH PLAIN ' + b64('\0' + cfg.user + '\0' + (cfg.pass || '')), [235]);
+        else { await cmd('AUTH LOGIN', [334]); await cmd(b64(cfg.user), [334]); await cmd(b64(cfg.pass || ''), [235]); }
+      }
+      await cmd(`MAIL FROM:<${addr(from)}>`, [250]);
+      for (const t of to) await cmd(`RCPT TO:<${addr(t)}>`, [250, 251]);
+      await cmd('DATA', [354]);
+      await cmd(message.replace(/^\./gm, '..') + '\r\n.', [250]);
+      try { sock.write('QUIT\r\n'); } catch {}
+      done = true; clearTimeout(timer); sock.end(); resolve(250);
+    })().catch(e => { clearTimeout(timer); fail(e); });
+  });
+}
+
 // msg: { title, message, url?, priority? (1-5), kind? }
 async function sendTo(ch, msg) {
   let r;
+  if (ch.type === 'email') {
+    await smtpSend(ch, { subject: msg.title, text: `${msg.message}${msg.url ? `\n\n${msg.url}` : ''}\n\n— Lateral` });
+    return 250;
+  }
   if (ch.type === 'ntfy') {
     const server = String(ch.server || 'https://ntfy.sh').replace(/\/+$/, '');
     const payload = { topic: ch.topic, title: msg.title, message: msg.message, priority: msg.priority || 3, tags: [msg.kind === 'system' ? 'warning' : msg.kind === 'tavily' ? 'moneybag' : 'newspaper'] };
@@ -144,6 +231,21 @@ async function deliver(msg) {
 
 // ─── Events ──────────────────────────────────────────────────────────────────
 
+// Quiet hours: the clock is the one the digest uses (the browser's UTC offset, saved with the settings).
+function inQuiet(at = new Date()) {
+  const q = db.config.quiet;
+  if (!q || !q.enabled || q.from === q.to) return false;
+  const { hhmm } = localNow(db.config.digest.tzOffsetMin, at);
+  return q.from < q.to ? (hhmm >= q.from && hhmm < q.to) : (hhmm >= q.from || hhmm < q.to);
+}
+function isMuted(storyId) {
+  if (!storyId) return false;
+  const m = db.config.muted[storyId];
+  if (!m) return false;
+  if (m.until && Date.now() > m.until) { delete db.config.muted[storyId]; saveSoon(); return false; }
+  return true;
+}
+
 function isInstant(e) {
   const i = db.config.instant;
   return (e.kind === 'prediction-move' && i.predictionMoves) || (e.kind === 'prediction-due' && i.resolutionDue)
@@ -153,9 +255,12 @@ function isInstant(e) {
 
 function addEvent(ev) {
   const e = { id: uid(), at: nowIso(), read: false, delivered: {}, severity: 'info', ...ev };
+  if (isMuted(e.storyId)) { e.muted = true; e.read = true; }
   db.events.unshift(e);
   if (db.events.length > MAX_EVENTS) db.events.length = MAX_EVENTS;
   saveSoon();
+  if (e.muted) { e.delivered.instant = 'muted'; return e; }
+  if (isInstant(e) && inQuiet() && !(db.config.quiet.allowImportant && e.severity === 'important')) { e.delivered.instant = 'held'; return e; }
   if (isInstant(e)) {
     e.delivered.instant = 'pending';
     deliver({ title: e.title, message: e.body, url: appLink(e.storyId), kind: e.kind, priority: e.severity === 'important' ? 4 : 3 })
@@ -236,7 +341,7 @@ function onRefreshRun(run) {
     const count = (recent && recent.data && recent.data.count || 0) + fresh.length;
     const merged = [...bullets, ...(recent ? String(recent.body).split('\n') : [])].filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 4);
     const title = `${clip(s.title, 70)}: ${count} new article${count === 1 ? '' : 's'}`;
-    if (recent) { recent.title = title; recent.body = merged.join('\n'); recent.data = { count }; recent.at = nowIso(); recent.read = false; recent.delivered = {}; saveSoon(); continue; }
+    if (recent) { recent.title = title; recent.body = merged.join('\n'); recent.data = { count }; recent.at = nowIso(); recent.muted = isMuted(recent.storyId); recent.read = recent.muted; recent.delivered = {}; saveSoon(); continue; }
     addEvent({ kind: 'story-activity', title, body: merged.join('\n'), storyId: s.id, data: { count } });
   }
 }
@@ -259,7 +364,7 @@ async function checkCivic() {
         const total = (recent.data && recent.data.count || 0) + count;
         recent.title = rest.title.replace(/: \d+ new or updated items?$/, `: ${total} new or updated item${total === 1 ? '' : 's'}`);
         recent.body = [...rest.body.split('\n'), ...String(recent.body).split('\n')].filter((x, i, a) => a.indexOf(x) === i).slice(0, 4).join('\n');
-        recent.data = { count: total }; recent.at = nowIso(); recent.read = false; recent.delivered = {};
+        recent.data = { count: total }; recent.at = nowIso(); recent.muted = isMuted(recent.storyId); recent.read = recent.muted; recent.delivered = {};
         continue;
       }
       rest.data = { count };
@@ -343,7 +448,7 @@ async function watchPredictions({ force = false } = {}) {
 // ─── Digest ──────────────────────────────────────────────────────────────────
 
 function compileDigest(sinceIso) {
-  const evs = db.events.filter(e => e.at > sinceIso && e.kind !== 'digest');
+  const evs = db.events.filter(e => e.at > sinceIso && e.kind !== 'digest' && !e.muted);
   const part = (kinds) => evs.filter(e => kinds.includes(e.kind));
   const moves = part(['prediction-move']), due = part(['prediction-due']), acts = part(['story-activity']), sys = part(['system', 'tavily']);
   const civ = part(['civic-vote', 'civic-deadline', 'civic-meeting', 'civic-activity']);
@@ -371,13 +476,30 @@ async function runDigest({ preview = false } = {}) {
   return { sent: results.some(r => r.ok), results, ...d };
 }
 
+// After quiet hours: everything that was held goes out as ONE message instead of a burst.
+async function releaseHeld() {
+  if (inQuiet()) return { sent: 0 };
+  db.events.filter(e => e.delivered && e.delivered.instant === 'held' && e.muted).forEach(e => { e.delivered.instant = 'muted'; });
+  const held = db.events.filter(e => e.delivered && e.delivered.instant === 'held' && !e.muted);
+  if (!held.length) return { sent: 0 };
+  held.forEach(e => { e.delivered.instant = 'pending'; });
+  const lines = held.slice(0, 8).map(e => `• ${clip(e.title, 110)}`);
+  if (held.length > 8) lines.push(`…and ${held.length - 8} more in Activity`);
+  const important = held.some(e => e.severity === 'important');
+  const results = await deliver({ title: `While you were away: ${held.length} update${held.length === 1 ? '' : 's'}`, message: lines.join('\n'), url: appLink(''), kind: 'catchup', priority: important ? 4 : 3 });
+  held.forEach(e => { e.delivered.instant = results.length ? results : 'no-channels'; });
+  saveSoon();
+  return { sent: held.length, results };
+}
+
 // ─── Scheduler ───────────────────────────────────────────────────────────────
 
 let lastHourly = 0, lastHalfHour = 0;
 async function tick() {
   try {
     const dg = db.config.digest;
-    if (dg.enabled) {
+    await releaseHeld();
+    if (dg.enabled && !inQuiet()) {
       const lt = localNow(dg.tzOffsetMin);
       if (lt.hhmm >= dg.time && db.state.lastDigestDay !== lt.day) {
         db.state.lastDigestDay = lt.day; saveSoon();
@@ -418,9 +540,13 @@ function publicConfig() {
   return {
     channels: c.channels.map(ch => ({
       id: ch.id, type: ch.type, name: ch.name, enabled: !!ch.enabled, server: ch.server || '',
-      topicHint: ch.type === 'ntfy' ? hint(ch.topic) : '', urlHint: ch.url ? `${(() => { try { return new URL(ch.url).host; } catch { return ''; } })()}/${hint(ch.url)}` : '', hasToken: !!ch.token,
+      topicHint: ch.type === 'ntfy' ? hint(ch.topic) : '',
+      ...(ch.type === 'email' ? { host: ch.host || '', port: ch.port || '', secure: ch.secure || 'starttls', user: ch.user || '', from: ch.from || '', to: ch.to || '', hasPass: !!ch.pass, allowSelfSigned: !!ch.allowSelfSigned } : {}),
+      urlHint: ch.url ? `${(() => { try { return new URL(ch.url).host; } catch { return ''; } })()}/${hint(ch.url)}` : '', hasToken: !!ch.token,
     })),
-    digest: c.digest, instant: c.instant, sensitivity: c.sensitivity, watch: c.watch, appUrl: c.appUrl,
+    digest: c.digest, instant: c.instant, sensitivity: c.sensitivity, watch: c.watch, appUrl: c.appUrl, quiet: c.quiet,
+    quietNow: inQuiet(),
+    muted: Object.keys(c.muted).filter(isMuted).map(id => ({ storyId: id, until: c.muted[id].until || null, title: ((readStories().find(s => s.id === id) || {}).title || 'A story that was removed').replace(/\s*\(Prediction\)\s*$/, '') })),
   };
 }
 
@@ -430,23 +556,38 @@ function applyConfig(body) {
     const old = new Map(c.channels.map(ch => [ch.id, ch]));
     c.channels = body.channels.slice(0, 8).map(n => {
       const prev = old.get(n.id) || {};
-      const type = ['ntfy', 'discord', 'slack', 'webhook'].includes(n.type) ? n.type : (prev.type || 'webhook');
+      const type = ['ntfy', 'discord', 'slack', 'webhook', 'email'].includes(n.type) ? n.type : (prev.type || 'webhook');
       const ch = { id: prev.id || uid(), type, name: clip(n.name || prev.name || type, 40), enabled: n.enabled !== false };
       if (type === 'ntfy') {
         ch.server = clip(n.server || prev.server || 'https://ntfy.sh', 200);
         ch.topic = String(n.topic || prev.topic || '').trim();
         ch.token = n.token !== undefined && n.token !== '' ? String(n.token).trim() : (prev.token || '');
+      } else if (type === 'email') {
+        const pick = k => (n[k] !== undefined ? String(n[k]).trim() : String(prev[k] || ''));
+        ch.host = clip(pick('host'), 200); ch.port = Math.max(0, Math.min(65535, Number(n.port !== undefined ? n.port : prev.port) || 0));
+        ch.secure = ['tls', 'starttls', 'none'].includes(n.secure) ? n.secure : (prev.secure || 'starttls');
+        ch.user = pick('user'); ch.from = clip(pick('from'), 200); ch.to = clip(pick('to'), 300);
+        ch.pass = n.pass !== undefined && n.pass !== '' ? String(n.pass) : (prev.pass || '');
+        ch.allowSelfSigned = n.allowSelfSigned !== undefined ? !!n.allowSelfSigned : !!prev.allowSelfSigned;
       } else {
         ch.url = String(n.url || prev.url || '').trim();
       }
       return ch;
-    }).filter(ch => (ch.type === 'ntfy' ? ch.topic : /^https?:\/\//i.test(ch.url)));
+    }).filter(ch => (ch.type === 'ntfy' ? ch.topic : ch.type === 'email' ? (ch.host && ch.to && (ch.from || ch.user)) : /^https?:\/\//i.test(ch.url)));
   }
   if (body.digest) {
     const d = body.digest;
     if (d.enabled !== undefined) c.digest.enabled = !!d.enabled;
     if (/^\d{2}:\d{2}$/.test(String(d.time || ''))) c.digest.time = d.time;
     if (Number.isFinite(Number(d.tzOffsetMin))) c.digest.tzOffsetMin = Math.max(-840, Math.min(840, Number(d.tzOffsetMin)));
+  }
+  if (body.quiet) {
+    const q = body.quiet;
+    if (q.enabled !== undefined) c.quiet.enabled = !!q.enabled;
+    if (/^\d{2}:\d{2}$/.test(String(q.from || ''))) c.quiet.from = q.from;
+    if (/^\d{2}:\d{2}$/.test(String(q.to || ''))) c.quiet.to = q.to;
+    if (q.allowImportant !== undefined) c.quiet.allowImportant = !!q.allowImportant;
+    if (Number.isFinite(Number(q.tzOffsetMin))) c.digest.tzOffsetMin = Math.max(-840, Math.min(840, Number(q.tzOffsetMin)));
   }
   if (body.instant) for (const k of Object.keys(c.instant)) if (body.instant[k] !== undefined) c.instant[k] = !!body.instant[k];
   if (body.sensitivity && Number.isFinite(Number(body.sensitivity.scoreDelta))) c.sensitivity.scoreDelta = Math.max(5, Math.min(60, Math.round(Number(body.sensitivity.scoreDelta))));
@@ -466,7 +607,7 @@ async function route(req, reqUrl, res, send) {
   if (sub === 'unread' && req.method === 'GET') return send(res, 200, { unread: db.events.filter(e => !e.read).length, important: db.events.filter(e => !e.read && e.severity === 'important').length });
   if (sub === 'events' && req.method === 'GET') {
     const limit = Math.min(200, Number(q.get('limit')) || 60);
-    return send(res, 200, { events: db.events.slice(0, limit).map(e => ({ id: e.id, at: e.at, kind: e.kind, severity: e.severity, title: e.title, body: e.body, storyId: e.storyId || '', read: !!e.read, delivered: e.delivered && e.delivered.instant ? e.delivered.instant : null })) });
+    return send(res, 200, { events: db.events.slice(0, limit).map(e => ({ id: e.id, at: e.at, kind: e.kind, severity: e.severity, title: e.title, body: e.body, storyId: e.storyId || '', read: !!e.read, muted: !!e.muted, delivered: e.delivered && e.delivered.instant ? e.delivered.instant : null })) });
   }
   if (sub === 'status' && req.method === 'GET') {
     const dg = db.config.digest, lt = localNow(dg.tzOffsetMin);
@@ -484,6 +625,15 @@ async function route(req, reqUrl, res, send) {
       saveSoon();
       return send(res, 200, { unread: db.events.filter(e => !e.read).length });
     }
+    if (sub === 'mute') {
+      const id = String(body.storyId || '');
+      if (!readStories().some(x => x.id === id)) return send(res, 404, { error: 'No such story.' });
+      const hours = Number(body.hours) > 0 ? Math.min(24 * 365, Number(body.hours)) : 0;
+      db.config.muted[id] = { until: hours ? Date.now() + hours * 3600000 : null, at: Date.now() };
+      saveSoon();
+      return send(res, 200, { config: publicConfig() });
+    }
+    if (sub === 'unmute') { delete db.config.muted[String(body.storyId || '')]; saveSoon(); return send(res, 200, { config: publicConfig() }); }
     if (sub === 'clear') { db.events = []; saveSoon(); return send(res, 200, { ok: true }); }
     if (sub === 'test') {
       const ch = db.config.channels.find(c => c.id === body.channelId);
@@ -504,4 +654,4 @@ async function route(req, reqUrl, res, send) {
   return send(res, 404, { error: 'Unknown alerts route.' });
 }
 
-module.exports = { init, route, checkPrediction, onRefreshRun, addEvent, checkDue, checkCivic, runDigest, configure: applyConfig, _db: () => db };
+module.exports = { init, route, smtpSend, inQuiet, isMuted, releaseHeld, checkPrediction, onRefreshRun, addEvent, checkDue, checkCivic, runDigest, configure: applyConfig, _db: () => db };
