@@ -1801,6 +1801,7 @@ function storyRelevanceCtx(story) {
     topic: String(story?.title || '').replace(/\s*\(Prediction\)\s*$/, '').trim(),
     ctx: String(story?.summary || '').replace(/\s+/g, ' ').slice(0, 280),
     tags: (story?.tags || []).slice(0, 6).join(', '),
+    strict: true,   // a tracked story: a "related" verdict also needs a key term in common with the story
   };
 }
 async function checkRelevance(rctx, articles) {

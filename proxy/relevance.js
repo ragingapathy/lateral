@@ -120,6 +120,7 @@ For each article choose one verdict:
 Rules:
 - Judge the article's SUBJECT, not keyword overlap. A shared name or term alone does not make it relevant.
 - Be strict about articles that are clearly about something else: if a reader browsing this topic would be puzzled or annoyed to see it, it is "off_topic".
+- "related" is for something a follower of THIS topic would specifically want: it names the topic's actors, event, place or subject. General news about a whole sector or theme ("AI", "the markets", "tech", "the economy", "the military") is NOT related just because the topic sits inside it: that is "off_topic".
 - But give plausible matches the benefit of the doubt. Headlines and snippets are short and often leave out context. If the article could easily be about the same subject using different words (an alternate name, a nickname, or a description of the same event), choose "related", NOT "off_topic". Choose "off_topic" only when you can tell the article is about a different subject.
 
 Reply with EXACTLY ${articles.length} lines, one per article, in this format and nothing else:
@@ -145,6 +146,84 @@ async function judgeBatch(ctx, articles) {
     }
   }
   return out;
+}
+
+// ─── Key terms (the strict guard) ────────────────────────────────────────────
+
+const STOPW = new Set('the and for with from that this these those about into over under after before amid new says said have has had are was were will its their them they what when where which while than then also not but how why who all any can may our out one two get got via'.split(' '));
+// Words that appear in generated story titles without naming anything ("The Rise and Controversy of …").
+const GENERIC = new Set('impact rise rises race future global world american america leadership controversy ethical ethics dilemmas usage use using uncovering unveiling journey quest generational building dominance project projects mission status report reports news latest update updates story stories policy policies issue issues crisis debate system systems technology tech security national international government states state public risk risks'.split(' '));
+const stem = w => (w.length > 5 ? w.replace(/(ing|ed|es|s)$/, '') : w);
+function termSet(text) {
+  const out = new Set();
+  for (const w of String(text || '').toLowerCase().replace(/[^a-z0-9\s'-]/g, ' ').split(/\s+/)) {
+    const t = w.replace(/^['-]+|['-]+$/g, '');
+    if (!t || STOPW.has(t) || GENERIC.has(t) || (t.length < 3 && !/^[a-z]+\d|^\d+[a-z]/.test(t))) continue;
+    if (/^\d+$/.test(t) && t.length < 3) continue;
+    out.add(stem(t));
+  }
+  return out;
+}
+function topicTerms(ctx) { return termSet(`${ctx.topic || ''} ${ctx.tags || ''}`); }
+// How many of the story's terms an article's headline and snippet contain (a longer word may continue a term: "tariffs" for "tariff").
+function termOverlap(terms, a) {
+  const have = termSet(`${a.title || ''} ${a.snippet || ''}`);
+  let n = 0;
+  for (const t of terms) { if (have.has(t) || (t.length >= 5 && [...have].some(h => h.startsWith(t)))) n++; }
+  return n;
+}
+
+// A topic or tag word in the article is enough. Failing that, the story's own summary can vouch for it, but it takes two of its words
+// (a title like "Lost City of Central Asia" may be covered as an "Atlantis-like metropolis in Kyrgyzstan").
+function contextTerms(ctx, exclude) {
+  const out = new Set();
+  for (const t of termSet(ctx.ctx || '')) if (!exclude || !exclude.has(t)) out.add(t);
+  return out;
+}
+function isWeakMatch(ctx, a) {
+  const terms = topicTerms(ctx);
+  if (!terms.size) return false;                                   // nothing to compare against: do not guess
+  if (termOverlap(terms, a) > 0) return false;
+  return termOverlap(contextTerms(ctx, terms), a) < 2;
+}
+
+// ─── Story-level gate (the server's background refresh and sweep use this) ───
+
+// The same context the app builds for a story: its title, a line of summary and its first tags. strict = the guard above is on.
+function storyContext(story) {
+  return {
+    topic: String(story && story.title || '').replace(/\s*\(Prediction\)\s*$/, '').trim(),
+    ctx: String(story && story.summary || '').replace(/\s+/g, ' ').slice(0, 280),
+    tags: ((story && story.tags) || []).slice(0, 6).join(', '),
+    strict: true,
+  };
+}
+
+// Judges a story's articles. Official items (Civic watches) are never second-guessed; anything not judged is kept (fail open).
+// -> { kept, filtered, stats }, where each filtered article carries relevance:{why, topic} like the app's own "Filtered out" list.
+async function gateStory(story, articles) {
+  const list = Array.isArray(articles) ? articles : [];
+  const rctx = storyContext(story);
+  const checkable = list.filter(a => a && a.url && a.title && !(a.source && a.source.engine === 'civic'));
+  if (!rctx.topic || !checkable.length) return { kept: list, filtered: [], stats: null };
+  try {
+    const out = await checkArticles(rctx, checkable.map(a => ({ url: a.url, title: a.title, snippet: String(a.snippet || a.summary || '').slice(0, 200), source: (a.source && (a.source.name || a.source.domain)) || '' })));
+    const kept = [], filtered = [];
+    for (const a of list) {
+      const v = a && a.url ? out.verdicts[a.url] : null;
+      if (v && v.v === 'off_topic' && !v.manual) filtered.push({ ...a, relevance: { why: v.why || '', topic: rctx.topic } });
+      else kept.push(a);
+    }
+    return { kept, filtered, stats: out.stats };
+  } catch (e) { return { kept: list, filtered: [], stats: { error: e.message } }; }
+}
+// Newly filtered first, then earlier ones that are still filtered (and not since kept), capped.
+function mergeFiltered(prev, fresh, kept) {
+  const keptUrls = new Set((kept || []).map(a => a.url));
+  const out = new Map();
+  for (const a of (fresh || [])) if (a && a.url) out.set(a.url, a);
+  for (const a of (prev || [])) if (a && a.url && !keptUrls.has(a.url) && !out.has(a.url)) out.set(a.url, a);
+  return [...out.values()].slice(0, 80);
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -213,6 +292,16 @@ async function checkArticlesNow(ctx, articles, arrivedAt) {
     });
   }
 
+  // Strict mode (tracked stories): a "related" verdict is only believed when the article actually shares key words with the story.
+  // The model is generous with "related"; an article that mentions none of the story's names, places or subjects is not one.
+  if (ctx.strict) {
+    for (const a of list) {
+      const v = verdicts[a.url];
+      if (!v || v.v !== 'related' || v.manual) continue;
+      if (isWeakMatch(ctx, a)) { verdicts[a.url] = { v: 'off_topic', why: 'Weak match: shares no key terms with this topic', cached: v.cached, guard: true }; stats.guarded = (stats.guarded || 0) + 1; }
+    }
+  }
+
   if (stats.judged > 0) saveCache();
   stats.ms = Date.now() - t0;
   stats.errors = [...new Set(stats.errors)].slice(0, 3);
@@ -228,4 +317,4 @@ function setOverride(topic, url, verdict = 'on_topic') {
   return true;
 }
 
-module.exports = { checkArticles, setOverride, normalizeVerdict, ollamaText };
+module.exports = { checkArticles, setOverride, normalizeVerdict, ollamaText, gateStory, mergeFiltered, storyContext, topicTerms, termOverlap, termSet, isWeakMatch };

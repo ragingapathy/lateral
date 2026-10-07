@@ -676,7 +676,7 @@ async function handleRelevanceCheck(req, res) {
   if (!topic) return send(res, 400, { error: 'Missing topic' });
   try {
     const out = await relevance.checkArticles(
-      { topic, ctx: String(body.ctx || '').slice(0, 400), tags: String(body.tags || '').slice(0, 200) },
+      { topic, ctx: String(body.ctx || '').slice(0, 400), tags: String(body.tags || '').slice(0, 200), strict: !!body.strict },
       Array.isArray(body.articles) ? body.articles : []
     );
     return send(res, 200, out);
@@ -4344,6 +4344,7 @@ const server = http.createServer(async (req, res) => {
   if (isImgStats && req.method === 'GET') return send(res, 200, images.getStats());
   if (isRelCheck && req.method === 'POST') return await handleRelevanceCheck(req, res);
   if (isRelOverride && req.method === 'POST') return await handleRelevanceOverride(req, res);
+  if (pathname === '/relevance/sweep' || pathname === '/api/lateral/relevance/sweep') return send(res, 200, req.method === 'POST' ? await sweepHeadlines() : sweepState);
 
   if (isData) {
     if (req.method === 'GET')  return await handleDataGet(res);
@@ -4451,7 +4452,11 @@ async function runAutoRefresh() {
       try { r = await fetchNewsFromSearx(query, { engines: NEWS_ENGINE_LIST, timeRange: 'week', timeout: 15000 }); }
       catch (searchErr) { if (!feedRes.items.length) throw searchErr; }
       const rawArticles = [...feedRes.items, ...normalizeNewsResults(r.results || []).slice(0, 12)];
-      const articles = stampFirstSeenServer(rawArticles, prev);
+      // Only articles that belong to the story reach its headlines (and the Home feed, and the "new coverage" alerts). Fails open:
+      // an article the judge could not read is kept. Earlier headlines are re-checked too, which is quick once they have verdicts.
+      const gate = await relevance.gateStory(story, rawArticles);
+      const prevGate = await relevance.gateStory(story, prev);
+      const articles = stampFirstSeenServer(gate.kept, prevGate.kept);
       const newCount   = articles.length;
       const newDomains = articles.map(a => hostFromUrl(a.url || '')).filter(Boolean);
       const novelDomains = [...new Set(newDomains.filter(d => !prevDomains.has(d)))];
@@ -4480,7 +4485,7 @@ async function runAutoRefresh() {
       // accumulated headline list the next time this story is opened.
       const mergedByUrl = new Map();
       for (const a of articles) if (a.url) mergedByUrl.set(a.url, a);
-      for (const a of prev) if (a.url && !mergedByUrl.has(a.url)) mergedByUrl.set(a.url, a);
+      for (const a of prevGate.kept) if (a.url && !mergedByUrl.has(a.url)) mergedByUrl.set(a.url, a);
       const mergedItems = [...mergedByUrl.values()]
         .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
         .slice(0, 30);
@@ -4488,7 +4493,9 @@ async function runAutoRefresh() {
       updateCacheFile(c => {
         const scc = { ...(c.storyCache || {}) };
         const cur = { ...(scc[story.id] || {}) };
-        cur.headlines = { items: mergedItems, generatedAt: nowIso() };
+        // Keep the reviewable "Filtered out" list: new rejects first, earlier ones that are still rejected after them.
+        const filtered = relevance.mergeFiltered((cur.headlines && cur.headlines.filtered) || [], [...gate.filtered, ...prevGate.filtered], mergedItems);
+        cur.headlines = { ...(cur.headlines || {}), items: mergedItems, filtered, generatedAt: nowIso() };
         cur.refreshState = { intervalHours, consecutiveSilent, nextCheckAt: nextCheckAtIso, lastCoverage: coverage };
         scc[story.id] = cur;
         c.storyCache = scc;
@@ -4530,6 +4537,56 @@ function scheduleAutoRefresh() {
 }
 
 scheduleAutoRefresh();
+
+// ─── Headline sweep ──────────────────────────────────────────────────────────
+// Re-checks the headlines already cached for every active story (the Home feed shows them): articles that were stored before the
+// background refresh was gated, or while the judge was down, get judged now, and the off-topic ones move to the story's reviewable
+// "Filtered out" list. Quick once an article has a verdict. One run at a time; started by POST /relevance/sweep, and once after the
+// first start of this version.
+const SWEEP_FLAG = path.join(DATA_DIR, 'relevance-sweep.json');
+let sweepState = { state: 'idle' };
+async function sweepHeadlines() {
+  if (sweepState.state === 'running') return sweepState;
+  const stories = readStoriesFile().filter(s => s.status !== 'resolved' && s.status !== 'buried');
+  sweepState = { state: 'running', startedAt: nowIso(), done: 0, total: stories.length, checked: 0, removed: 0, failedOpen: 0, errors: [] };
+  const st = sweepState;
+  (async () => {
+    for (const story of stories) {
+      try {
+        const items = readCacheFile()?.storyCache?.[story.id]?.headlines?.items || [];
+        if (items.length) {
+          const gate = await relevance.gateStory(story, items);
+          st.checked += items.length; st.failedOpen += (gate.stats && gate.stats.failedOpen) || 0;
+          if (gate.stats && gate.stats.error) st.errors.push(gate.stats.error);
+          if (gate.filtered.length) {
+            const gone = new Set(gate.filtered.map(a => a.url));
+            updateCacheFile(c => {
+              const scc = { ...(c.storyCache || {}) };
+              const cur = { ...(scc[story.id] || {}) };
+              const h = { ...(cur.headlines || {}) };
+              h.items = (h.items || []).filter(a => !gone.has(a.url));
+              h.filtered = relevance.mergeFiltered(h.filtered || [], gate.filtered, h.items);
+              cur.headlines = h; scc[story.id] = cur; c.storyCache = scc;
+              return c;
+            });
+            st.removed += gate.filtered.length;
+          }
+        }
+      } catch (e) { st.errors.push(e.message); }
+      st.done++;
+    }
+    st.state = 'done'; st.finishedAt = nowIso(); st.errors = [...new Set(st.errors)].slice(0, 3);
+    console.log(`[Sweep] Checked ${st.checked} cached headlines in ${st.total} stories: ${st.removed} moved to Filtered out${st.failedOpen ? `, ${st.failedOpen} could not be judged` : ''}`);
+    try { fs.writeFileSync(SWEEP_FLAG, JSON.stringify({ version: 1, at: st.finishedAt, removed: st.removed, failedOpen: st.failedOpen })); } catch { /* not fatal */ }
+  })().catch(e => { st.state = 'error'; st.errors.push(e.message); });
+  return st;
+}
+// Once, shortly after the first start of this version, and again when an earlier sweep could not judge everything.
+setTimeout(() => {
+  let prev = null; try { prev = JSON.parse(fs.readFileSync(SWEEP_FLAG, 'utf8')); } catch { /* first time */ }
+  if (!prev || prev.failedOpen > 0) sweepHeadlines().catch(() => {});
+}, 90 * 1000);
+
 
 // ── Model warmup (opt-in) ──────────────────────────────────────────────────────
 // Keeps the chat model loaded in Ollama memory so the first AI request is fast.

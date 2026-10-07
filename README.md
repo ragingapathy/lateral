@@ -403,6 +403,12 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
 
 ## What's new
 
+**v2.3.1 — Stricter relevance for tracked stories.** The background refresh now runs the relevance check before storing a story's
+headlines (before, only opening a story did, so off-topic articles reached the Home feed), keeps each story's **Filtered out** list
+between runs, and sweeps headlines already stored. For tracked stories a "related" verdict now also needs the article to share a
+key name or subject with the story (or two words from its summary), and the judge is told that general sector news is not related.
+`POST /api/lateral/relevance/sweep` re-checks everything on demand.
+
 **v2.3 — Podcasts.** Podcast Context ranks episodes against your story and hides the weak ones, **Transcribe** makes a local,
 timestamped, searchable transcript with Whisper, and **Key moments** finds the passages that are really about the story so you can
 play from them. The NotebookLM button became **Export**: PDF, a Markdown file or an Obsidian vault, with saved articles and podcast transcripts optional. Civic gains **Boards and agendas** (county Legistar sites, Granicus cities and any feed, each watchable, with members and terms listed from Legistar), **term dates** for officials, and two more searchable offices (city manager, other county officers). Alerts gain **quiet hours**, **per-story mute**, an **email (SMTP) channel** and a **prediction flips** feed. Headline lists and the Home feed now fold repeats of one story into a single entry (**+N outlets**), and the
