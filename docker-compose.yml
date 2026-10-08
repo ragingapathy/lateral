@@ -19,6 +19,10 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./index.html:/srv/index.html:ro
+      - ./manifest.json:/srv/manifest.json:ro
+      - ./sw.js:/srv/sw.js:ro
+      - ./icon-192.png:/srv/icon-192.png:ro
+      - ./icon-512.png:/srv/icon-512.png:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"   # lets Caddy reach Ollama on the host (built in on Docker Desktop)
     depends_on:

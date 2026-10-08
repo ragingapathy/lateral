@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#b86b4a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <title>Lateral — Narrative Memory</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -196,7 +201,11 @@
     [data-theme="ledger"] [style*="Playfair Display"] { font-family: 'Libre Caslon Text', Georgia, serif !important; }
 
     *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; transition: background 0.3s; }
+    html, body { margin: 0; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; transition: background 0.3s; overflow-x: hidden; overscroll-behavior: none; }
+    /* Mobile: stop sideways rubber-banding and let the main column scroll naturally */
+    @media (max-width: 768px) {
+      html, body { touch-action: pan-y; }
+    }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -8883,7 +8892,7 @@ function CenterPanel({ onOpenLibrary, story, selEpId, onSelEp, onAddEp, onDiscov
 
   // Normal story — existing timeline view
   return (
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:C.bg}}>
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',background:C.bg,minHeight:0}}>
       {/* Story header */}
       <div style={{padding:'18px 24px 14px',borderBottom:`1px solid ${C.borderLight}`,display:'flex',flexDirection:isTablet?'column':'row',alignItems:'flex-start',gap:isTablet?6:12,background:C.surface,flexShrink:0}}>
         <div style={{flex:1,minWidth:0}}>
@@ -11451,6 +11460,222 @@ function SetupStatusPanel({ onShowShortcuts }) {
   );
 }
 
+// Settings → Agents: configure Hermes, OpenFang, OpenClaw, Muse, or custom agents
+function AgentsPanel() {
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [testState, setTestState] = useState({});
+  const [draft, setDraft] = useState({ name: '', type: 'hermes', baseUrl: '', apiKey: '', model: '', enabled: true });
+  const [editingId, setEditingId] = useState(null);
+
+  const AGENT_TYPES = [
+    { id: 'hermes', label: 'Hermes' },
+    { id: 'openfang', label: 'OpenFang' },
+    { id: 'openclaw', label: 'OpenClaw' },
+    { id: 'muse', label: 'Muse' },
+    { id: 'custom', label: 'Custom' },
+  ];
+
+  useEffect(() => { loadAgents(); }, []);
+
+  async function api(suffix, opts) {
+    const candidates = [
+      `/api/lateral${suffix}`,
+      suffix,
+      `http://localhost:3005/api/lateral${suffix}`,
+      `http://localhost:3005${suffix}`,
+    ];
+    let lastErr = '';
+    for (const u of candidates) {
+      try {
+        const r = await fetch(u, opts);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { lastErr = d?.error || `HTTP ${r.status}`; continue; }
+        return d;
+      } catch (e) { lastErr = e?.message || 'Network error'; }
+    }
+    throw new Error(lastErr || 'Request failed');
+  }
+
+  async function loadAgents() {
+    try {
+      setLoading(true);
+      const d = await api('/agents/config');
+      setAgents(Array.isArray(d.agents) ? d.agents : []);
+      setStatus('');
+    } catch (e) {
+      setStatus(`Could not load agents: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveAgents(nextAgents) {
+    try {
+      setLoading(true);
+      const d = await api('/agents/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agents: nextAgents }),
+      });
+      setAgents(Array.isArray(d.agents) ? d.agents : nextAgents);
+      setStatus('✓ Saved');
+    } catch (e) {
+      setStatus(`Save failed: ${e.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function testAgent(agent) {
+    const id = agent.id;
+    setTestState(prev => ({ ...prev, [id]: { state: 'testing', note: 'Testing…' } }));
+    try {
+      const d = await api('/agents/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl: agent.baseUrl, apiKey: agent.apiKey, model: agent.model }),
+      });
+      if (d.ok) {
+        setTestState(prev => ({ ...prev, [id]: { state: 'ok', note: `OK in ${d.latencyMs}ms • ${d.modelUsed || 'connected'}` } }));
+      } else {
+        setTestState(prev => ({ ...prev, [id]: { state: 'fail', note: d.error || 'Connection failed' } }));
+      }
+    } catch (e) {
+      setTestState(prev => ({ ...prev, [id]: { state: 'fail', note: e.message } }));
+    }
+  }
+
+  function addAgent() {
+    const name = String(draft.name || '').trim();
+    const baseUrl = String(draft.baseUrl || '').trim();
+    if (!name || !baseUrl) { setStatus('Name and Base URL are required'); return; }
+    const id = editingId || crypto.randomUUID?.() || Math.random().toString(36).slice(2);
+    const agent = { id, name, type: draft.type, baseUrl, apiKey: draft.apiKey, model: draft.model, enabled: draft.enabled };
+    const next = editingId ? agents.map(a => a.id === editingId ? agent : a) : [...agents, agent];
+    saveAgents(next);
+    setDraft({ name: '', type: 'hermes', baseUrl: '', apiKey: '', model: '', enabled: true });
+    setEditingId(null);
+  }
+
+  function removeAgent(id) {
+    if (!window.confirm('Remove this agent?')) return;
+    saveAgents(agents.filter(a => a.id !== id));
+  }
+
+  function startEdit(agent) {
+    setDraft({ name: agent.name, type: agent.type, baseUrl: agent.baseUrl, apiKey: agent.apiKey, model: agent.model, enabled: agent.enabled });
+    setEditingId(agent.id);
+  }
+
+  function cancelEdit() {
+    setDraft({ name: '', type: 'hermes', baseUrl: '', apiKey: '', model: '', enabled: true });
+    setEditingId(null);
+  }
+
+  function toggleEnabled(id) {
+    saveAgents(agents.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a));
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.textMid, lineHeight: 1.6, marginBottom: 12 }}>
+        Connect AI agents that Lateral can call for research, calendar fills, briefings, and more.
+        Each agent needs a base URL and optional API key.
+      </div>
+
+      {status && (
+        <div style={{ fontSize: 12, marginBottom: 10, color: status.startsWith('✓') ? '#059669' : '#dc2626' }}>{status}</div>
+      )}
+
+      {/* Agent list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {agents.map(agent => {
+          const test = testState[agent.id] || {};
+          const testColor = test.state === 'ok' ? '#059669' : test.state === 'fail' ? '#dc2626' : test.state === 'testing' ? '#d97706' : '#9ca3af';
+          return (
+            <div key={agent.id} style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 12px', background: C.surface }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: agent.enabled ? C.text : C.textMute }}>{agent.name}</span>
+                <span style={{ fontSize: 11, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{agent.type}</span>
+                {agent.model && <span style={{ fontSize: 11, color: C.textMute }}>{agent.model}</span>}
+                <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: C.textMute, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={agent.enabled} onChange={() => toggleEnabled(agent.id)} />
+                    {agent.enabled ? 'On' : 'Off'}
+                  </label>
+                  <button onClick={() => testAgent(agent)} disabled={test.state === 'testing'} style={{ fontSize: 11, color: C.accent, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>
+                    {test.state === 'testing' ? 'Testing…' : 'Test'}
+                  </button>
+                  <button onClick={() => startEdit(agent)} style={{ fontSize: 11, color: C.accent, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>Edit</button>
+                  <button onClick={() => removeAgent(agent.id)} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>Remove</button>
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: C.textMute, marginTop: 4, wordBreak: 'break-all' }}>{agent.baseUrl}</div>
+              {test.note && (
+                <div style={{ fontSize: 11, marginTop: 4, color: testColor }}>{test.state === 'ok' ? '✓ ' : test.state === 'fail' ? '✗ ' : ''}{test.note}</div>
+              )}
+            </div>
+          );
+        })}
+        {agents.length === 0 && (
+          <div style={{ fontSize: 12, color: C.textMute, padding: '12px 0' }}>No agents configured yet. Add one below.</div>
+        )}
+      </div>
+
+      {/* Add/Edit form */}
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 12px 10px', background: C.bg }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+          {editingId ? 'Edit agent' : 'Add agent'}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <div style={{ fontSize: 11, color: C.textMute, marginBottom: 3 }}>Name</div>
+              <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Hermes" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              <div style={{ fontSize: 11, color: C.textMute, marginBottom: 3 }}>Type</div>
+              <select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+                {AGENT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: C.textMute, marginBottom: 3 }}>Base URL</div>
+            <input value={draft.baseUrl} onChange={e => setDraft({ ...draft, baseUrl: e.target.value })} placeholder="http://100.96.63.84/hermes/v1" style={{ ...inputStyle, width: '100%' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <div style={{ fontSize: 11, color: C.textMute, marginBottom: 3 }}>API key (optional)</div>
+              <input type="password" value={draft.apiKey} onChange={e => setDraft({ ...draft, apiKey: e.target.value })} placeholder="Bearer token" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div style={{ flex: '1 1 140px' }}>
+              <div style={{ fontSize: 11, color: C.textMute, marginBottom: 3 }}>Model (optional)</div>
+              <input value={draft.model} onChange={e => setDraft({ ...draft, model: e.target.value })} placeholder="hermes-agent" style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.textMid, cursor: 'pointer' }}>
+              <input type="checkbox" checked={draft.enabled} onChange={e => setDraft({ ...draft, enabled: e.target.checked })} />
+              Enabled
+            </label>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              {editingId && (
+                <button onClick={cancelEdit} style={{ fontSize: 12, color: C.textMute, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>Cancel</button>
+              )}
+              <button onClick={addAgent} disabled={loading} style={{ fontSize: 12, color: C.accent, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: 0 }}>
+                {editingId ? 'Save changes' : 'Add agent'}
+              </button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavilyUsage, setTavilyUsage, initialTab, onShowShortcuts, stories }) {
   const [f,setF]=useState(settings);
   const [tab,setTab]=useState(initialTab || 'basic');
@@ -11767,6 +11992,7 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavil
         {tabBtn('basic', 'Basic')}
         {tabBtn('search', `Web search${keysLoaded && !keyStatus.hasTavily ? ' ⚠' : ''}`)}
         {tabBtn('models', 'Model setup')}
+        {tabBtn('agents', 'Agents')}
         {tabBtn('podcasts', 'Podcasts')}
         {tabBtn('alerts', 'Alerts')}
         {tabBtn('feeds', 'Feeds')}
@@ -11776,6 +12002,7 @@ function SettingsModal({ settings, onSave, onClose, onPurgeDeletedStories, tavil
       {tab === 'alerts' && <AlertsPanel/>}
       {tab === 'feeds' && <FeedsPanel stories={stories}/>}
       {tab === 'status' && <SetupStatusPanel onShowShortcuts={onShowShortcuts}/>}
+      {tab === 'agents' && <AgentsPanel/>}
 
       {tab === 'basic' && (
         <>
@@ -16607,7 +16834,7 @@ function App() {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setThemeTo }}>
-    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:C.bg}}>
+    <div style={{height:'100dvh',display:'flex',flexDirection:'column',background:C.bg}}>
       <header style={{position:'relative',flexShrink:0,display:'flex',flexDirection:'column',padding:isMobile?'8px 12px':'0 20px',background:C.surface,borderBottom:`1px solid ${C.borderLight}`,boxShadow:'0 1px 3px rgba(0,0,0,0.06)',gap:isMobile?8:0}}>
         <div style={{height:isMobile?'auto':52,display:'flex',alignItems:'center',gap:10,minWidth:0}}>
           {isMobile && (
@@ -16701,7 +16928,7 @@ function App() {
           </span>
         </div>
       )}
-      <div style={{flex:1,display:'flex',overflow:'hidden',position:'relative'}}>
+      <div style={{flex:1,display:'flex',overflow:'hidden',position:'relative',minHeight:0}}>
         {!isMobile && (
           <LeftPanel
             stories={storiesView}
@@ -16792,6 +17019,11 @@ function App() {
     </div>
     </ThemeContext.Provider>
   );
+}
+
+// Register service worker for PWA support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);

@@ -21,6 +21,7 @@ const LLM_SECRETS_FILE = path.join(DATA_DIR, 'llm-secrets.json');
 const INTEL_LOG_FILE    = path.join(DATA_DIR, 'intelligence.log');
 const REFRESH_LOG_FILE  = path.join(DATA_DIR, 'refresh-log.json');
 const PURGED_IDS_FILE   = path.join(DATA_DIR, 'purged-ids.json');
+const AGENTS_FILE       = path.join(DATA_DIR, 'agents.json');
 const PURGE_TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const SEARXNG_URL = process.env.SEARXNG_URL || 'http://vane:8080';
@@ -314,6 +315,101 @@ async function handleSettingsPost(req, res) {
       send(res, 200, { ok: true, ...payload });
     } catch (e) {
       send(res, 400, { error: 'Invalid JSON: ' + e.message });
+    }
+  });
+}
+
+// ─── Agent configuration ──────────────────────────────────────────────────────
+
+function agentsDefaults() {
+  return { agents: [], updatedAt: new Date().toISOString() };
+}
+
+async function handleAgentsGet(res) {
+  try {
+    const data = readJsonFileSafe(AGENTS_FILE, agentsDefaults());
+    send(res, 200, data);
+  } catch (e) {
+    send(res, 500, { error: e.message });
+  }
+}
+
+async function handleAgentsPost(req, res) {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    try {
+      ensureDataDir();
+      const incoming = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const existing = readJsonFileSafe(AGENTS_FILE, agentsDefaults());
+      const agents = Array.isArray(incoming?.agents) ? incoming.agents : existing.agents || [];
+      // Validate each agent
+      const cleaned = agents.map(a => ({
+        id: String(a.id || crypto.randomBytes(6).toString('hex')),
+        name: String(a.name || a.type || 'Agent').trim(),
+        type: String(a.type || 'custom').trim().toLowerCase(),
+        baseUrl: String(a.baseUrl || '').trim(),
+        apiKey: String(a.apiKey || '').trim(),
+        model: String(a.model || '').trim(),
+        enabled: a.enabled !== false,
+      }));
+      const payload = { agents: cleaned, updatedAt: new Date().toISOString() };
+      fs.writeFileSync(AGENTS_FILE, JSON.stringify(payload), 'utf8');
+      send(res, 200, { ok: true, ...payload });
+    } catch (e) {
+      send(res, 400, { error: 'Invalid JSON: ' + e.message });
+    }
+  });
+}
+
+async function handleAgentsTest(req, res) {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', async () => {
+    try {
+      const incoming = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const baseUrl = String(incoming?.baseUrl || '').trim().replace(/\/+$/, '');
+      const apiKey = String(incoming?.apiKey || '').trim();
+      const model = String(incoming?.model || '').trim();
+      if (!baseUrl) return send(res, 400, { error: 'Missing baseUrl' });
+      const start = Date.now();
+      const modelsUrl = `${baseUrl}/models`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+      const r = await new Promise((resolve, reject) => {
+        const client = modelsUrl.startsWith('https:') ? https : http;
+        const req2 = client.request(modelsUrl, { method: 'GET', headers, timeout: 15000 }, (res2) => {
+          let body = '';
+          res2.on('data', d => body += d);
+          res2.on('end', () => resolve({ status: res2.statusCode, body }));
+        });
+        req2.on('error', reject);
+        req2.on('timeout', () => { req2.destroy(); reject(new Error('Timeout')); });
+        req2.end();
+      });
+      const latencyMs = Date.now() - start;
+      let models = [];
+      let modelUsed = '';
+      if (r.status === 200) {
+        try {
+          const d = JSON.parse(r.body);
+          models = Array.isArray(d.data) ? d.data.map(m => m.id || m.model || m.name).filter(Boolean) : [];
+          if (!models.length && Array.isArray(d.models)) models = d.models.map(m => m.id || m.model || m.name).filter(Boolean);
+          if (!models.length && Array.isArray(d)) models = d.map(m => m.id || m.model || m.name).filter(Boolean);
+          if (model && models.includes(model)) modelUsed = model;
+          else if (models.length) modelUsed = models[0];
+        } catch {}
+      }
+      send(res, 200, {
+        ok: r.status === 200,
+        status: r.status,
+        latencyMs,
+        modelUsed,
+        modelsAvailable: models,
+        error: r.status !== 200 ? `HTTP ${r.status}` : undefined
+      });
+    } catch (e) {
+      send(res, 200, { ok: false, error: e.message || 'Connection failed' });
     }
   });
 }
@@ -4322,6 +4418,8 @@ const server = http.createServer(async (req, res) => {
   const isBackup  = pathname === '/backup'       || pathname === '/api/lateral/backup';
   const isRestore = pathname === '/restore'      || pathname === '/api/lateral/restore';
   const isHealth  = pathname === '/health/check' || pathname === '/api/lateral/health/check';
+  const isAgentsConfig = pathname === '/agents/config' || pathname === '/api/lateral/agents/config';
+  const isAgentsTest   = pathname === '/agents/test'   || pathname === '/api/lateral/agents/test';
   const opsCtx = { dataDir: DATA_DIR, send, getTavilyKey: () => resolveLlmSecrets().tavilyApiKey };
   if (pathname.startsWith('/archive/') || pathname.startsWith('/api/lateral/archive/')) {
     if (await archive.route(req, reqUrl, res, send) !== false) return;
@@ -4368,6 +4466,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET')  return await handleSettingsGet(res);
     if (req.method === 'POST') return await handleSettingsPost(req, res);
   }
+  if (isAgentsConfig) {
+    if (req.method === 'GET')  return await handleAgentsGet(res);
+    if (req.method === 'POST') return await handleAgentsPost(req, res);
+  }
+  if (isAgentsTest && req.method === 'POST') return await handleAgentsTest(req, res);
   if (isVale && req.method === 'POST') return await handleVale(req, res);
   if (isLlmProviders && req.method === 'GET') return await handleLlmProviders(res);
   if (isLlmModels && req.method === 'GET') return await handleLlmModels(reqUrl, res);
