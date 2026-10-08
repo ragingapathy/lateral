@@ -569,6 +569,7 @@ async function lookup(rawAddress) {
     try { require('./civic-boards').placeChanged(jurisdictions); } catch { /* boards are optional */ }
     try { require('./civic-media').placeChanged(jurisdictions); } catch { /* local media is optional */ }
     try { require('./civic-ballot').placeChanged(jurisdictions); } catch { /* the ballot is optional */ }
+    try { require('./calendar-sources').placeChanged(jurisdictions); } catch { /* the calendar is optional */ }
     return db.profile;
   } finally { inFlight = null; }
 }

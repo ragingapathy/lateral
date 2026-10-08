@@ -31,7 +31,7 @@ const civic = () => require('./civic');
 let ctx = {};                                   // test hooks: get, ollamaText, now, profile
 const httpGet = (url, opts) => (ctx.get || civic().get)(url, { timeout: 20000, ...opts });
 const nowMs = () => (ctx.now ? ctx.now() : Date.now());
-const todayStr = () => new Date(nowMs()).toISOString().slice(0, 10);
+const todayStr = () => { try { return require('./calendar-sources').localToday(nowMs()); } catch { return new Date(nowMs()).toISOString().slice(0, 10); } };
 const profile = () => (ctx.profile ? ctx.profile() : civic().profile());
 
 const sha = s => crypto.createHash('sha1').update(String(s)).digest('hex').slice(0, 10);

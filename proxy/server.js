@@ -4326,6 +4326,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/archive/') || pathname.startsWith('/api/lateral/archive/')) {
     if (await archive.route(req, reqUrl, res, send) !== false) return;
   }
+  if (/^(\/api\/lateral)?\/calendar\//.test(pathname)) {
+    if (await require('./calendar').route(req, reqUrl, res, send) !== false) return;
+  }
   if (/^(\/api\/lateral)?\/feeds?\//.test(pathname)) {
     if (await feeds.route(req, reqUrl, res, send) !== false) return;
   }

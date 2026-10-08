@@ -7134,6 +7134,493 @@ function civicNewsPlan(civic) {
   return groups;
 }
 
+// ── City calendar: the civic dates Lateral knows, on one calendar ────────────
+// Takes over the center pane (button next to Brief). Step 1 shows voting dates, deadlines, council and board meetings and terms of
+// office; later steps add local events from sources you point it at.
+const CAL_KINDS = { vote: { label: 'Voting', color: '#2563eb' }, deadline: { label: 'Deadlines', color: '#dc2626' }, meeting: { label: 'Meetings', color: '#7c3aed' }, term: { label: 'Terms', color: '#b45309' }, event: { label: 'Local events', color: '#059669' }, food: { label: 'Food & drink', color: '#ea580c' }, mine: { label: 'My events', color: '#0891b2' } };
+const CAL_STORE = 'lateral-calendar-v1';
+const calDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const calFromDay = s => new Date(s + 'T12:00:00');
+const calTime = t => { const m = String(t || '').match(/^(\d{2}):(\d{2})$/); if (!m) return ''; const h = Number(m[1]); return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`; };
+// One event per day it covers (a span such as early voting shows on every day), each marked when it is a continuation.
+function calByDay(events) {
+  const out = {};
+  for (const e of events) {
+    const last = e.endDate && e.endDate > e.date ? e.endDate : e.date;
+    let d = calFromDay(e.date), n = 0;
+    while (calDay(d) <= last && n < 400) { (out[calDay(d)] = out[calDay(d)] || []).push({ ...e, cont: n > 0, first: n === 0, final: calDay(d) === last }); d.setDate(d.getDate() + 1); n++; }
+  }
+  return out;
+}
+
+// ── City calendar: your own events and the calendars it reads ────────────────
+const calApi = (p, body) => fetch('/api/lateral/calendar/' + p, body === undefined ? undefined : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()).catch(e => ({ error: e.message }));
+const CAL_WD = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const CAL_WD_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const CAL_ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth'];
+const CAL_ZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu', 'America/Detroit', 'America/Indiana/Indianapolis', 'America/Boise'];
+
+// Add or change an event, with repeat options. `initial` is a saved event (or null for a new one on `defaultDate`).
+function CalendarEventEditor({ initial, prefill, notes, defaultDate, onClose, onSaved }) {
+  const start = initial || prefill || { title: '', date: defaultDate, time: '', endTime: '', endDate: '', location: '', url: '', detail: '', recur: null };
+  const [kind, setKind] = useState(start.kind || 'mine');
+  const r0 = start.recur;
+  const [f, setF] = useState({ title: start.title, date: start.date, allDay: !start.time, time: start.time || '18:00', endTime: start.endTime || '', endDate: start.endDate || '', location: start.location || '', url: start.url || '', detail: start.detail || '' });
+  const [rep, setRep] = useState(r0 ? r0.freq : 'NONE');
+  const [every, setEvery] = useState(r0 ? r0.interval || 1 : 1);
+  const [wdays, setWdays] = useState(r0 && r0.freq === 'WEEKLY' && r0.byday ? r0.byday : []);
+  const [mmode, setMmode] = useState(r0 && r0.freq === 'MONTHLY' ? (r0.bymonthday ? 'date' : (r0.byday && /^-1/.test(r0.byday[0]) ? 'last' : 'nth')) : 'date');
+  const [ends, setEnds] = useState(r0 ? (r0.until ? 'until' : r0.count ? 'count' : 'never') : 'never');
+  const [until, setUntil] = useState(r0 && r0.until ? r0.until : '');
+  const [count, setCount] = useState(r0 && r0.count ? r0.count : 10);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const set = patch => setF(x => ({ ...x, ...patch }));
+  const d = f.date ? new Date(f.date + 'T12:00:00') : new Date();
+  const dom = d.getDate(), wd = d.getDay(), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const nth = Math.ceil(dom / 7), isLast = dom + 7 > dim;
+  const label = {fontSize:11,fontWeight:700,color:C.textMute,marginBottom:3,display:'block'};
+  const row = {display:'flex',gap:10,flexWrap:'wrap',marginBottom:10};
+  const col = flex => ({flex,minWidth:0});
+  const input = {...inputStyle,fontSize:13,padding:'6px 9px'};
+  const unit = { DAILY: 'day', WEEKLY: 'week', MONTHLY: 'month', YEARLY: 'year' }[rep];
+
+  async function save() {
+    setBusy(true); setErr('');
+    const body = { id: initial ? initial.id : undefined, title: f.title, date: f.date, time: f.allDay ? '' : f.time, endTime: f.allDay ? '' : f.endTime, endDate: f.endDate, location: f.location, url: f.url, detail: f.detail, kind, recur: null };
+    if (rep !== 'NONE') {
+      const r = { freq: rep, interval: Number(every) || 1 };
+      if (rep === 'WEEKLY') r.byday = wdays.length ? wdays : [CAL_WD[wd]];
+      if (rep === 'MONTHLY') { if (mmode === 'date') r.bymonthday = [dom]; else if (mmode === 'last') r.byday = ['-1' + CAL_WD[wd]]; else r.byday = [nth + CAL_WD[wd]]; }
+      if (ends === 'until') r.until = until; else if (ends === 'count') r.count = Number(count) || 1;
+      body.recur = r;
+    }
+    const out = await calApi('event/save', body);
+    setBusy(false);
+    if (out.error) { setErr(out.error); return; }
+    onSaved(out.event);
+  }
+
+  return (
+    <Modal title={initial ? 'Edit event' : 'Add an event'} onClose={onClose} maxWidth={560}>
+      <div style={{marginBottom:10}}>
+        <span style={label}>Title</span>
+        <input autoFocus value={f.title} onChange={e => set({ title: e.target.value })} placeholder="Farmers market, block party, trivia night…" style={input}/>
+      </div>
+      {notes && notes.length > 0 && (
+        <div style={{marginBottom:10,padding:'8px 10px',background:C.accent + '10',border:`1px solid ${C.borderLight}`,borderRadius:8,fontSize:12.5,color:C.text,lineHeight:1.55}}>
+          <div style={{fontSize:10.5,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:2}}>How I read that</div>
+          {notes.map((n, i) => <div key={i}>{n}</div>)}
+          <div style={{fontSize:11,color:C.textMute,marginTop:3}}>Read by the local model; check the details below, then Save.</div>
+        </div>
+      )}
+      <div style={{marginBottom:10}}>
+        <span style={label}>Type</span>
+        <select value={kind} onChange={e => setKind(e.target.value)} style={input}>
+          <option value="mine">Personal</option><option value="food">Food and drink</option><option value="event">Community event</option>
+        </select>
+      </div>
+      <div style={row}>
+        <div style={col('1 1 150px')}><span style={label}>{f.endDate ? 'Starts' : 'Date'}</span><input type="date" value={f.date} onChange={e => set({ date: e.target.value })} style={input}/></div>
+        <div style={col('1 1 150px')}><span style={label}>Ends on (optional)</span><input type="date" value={f.endDate} min={f.date} onChange={e => set({ endDate: e.target.value })} style={input}/></div>
+      </div>
+      <label style={{display:'flex',gap:6,alignItems:'center',fontSize:12.5,color:C.textMid,marginBottom:8,cursor:'pointer'}}><input type="checkbox" checked={f.allDay} onChange={e => set({ allDay: e.target.checked })}/> All day</label>
+      {!f.allDay && (
+        <div style={row}>
+          <div style={col('1 1 130px')}><span style={label}>Starts</span><input type="time" value={f.time} onChange={e => set({ time: e.target.value })} style={input}/></div>
+          <div style={col('1 1 130px')}><span style={label}>Ends (optional)</span><input type="time" value={f.endTime} onChange={e => set({ endTime: e.target.value })} style={input}/></div>
+        </div>
+      )}
+      <div style={row}>
+        <div style={col('1 1 200px')}><span style={label}>Where</span><input value={f.location} onChange={e => set({ location: e.target.value })} placeholder="Place or address" style={input}/></div>
+        <div style={col('1 1 200px')}><span style={label}>Link</span><input value={f.url} onChange={e => set({ url: e.target.value })} placeholder="https://…" style={input}/></div>
+      </div>
+      <div style={{marginBottom:12}}><span style={label}>Notes</span><textarea value={f.detail} onChange={e => set({ detail: e.target.value })} rows={2} style={{...input,resize:'vertical',fontFamily:'inherit'}}/></div>
+
+      <div style={{padding:'10px 12px',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8,marginBottom:12}}>
+        <div style={row}>
+          <div style={col('1 1 160px')}>
+            <span style={label}>Repeats</span>
+            <select value={rep} onChange={e => setRep(e.target.value)} style={input}>
+              <option value="NONE">Does not repeat</option><option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option><option value="YEARLY">Yearly</option>
+            </select>
+          </div>
+          {rep !== 'NONE' && <div style={col('0 1 120px')}><span style={label}>Every</span><div style={{display:'flex',gap:6,alignItems:'center'}}><input type="number" min="1" max="52" value={every} onChange={e => setEvery(e.target.value)} style={{...input,width:64}}/><span style={{fontSize:12.5,color:C.textMid}}>{unit}{Number(every) === 1 ? '' : 's'}</span></div></div>}
+        </div>
+        {rep === 'WEEKLY' && (
+          <div style={{marginBottom:10}}>
+            <span style={label}>On</span>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {CAL_WD.map((c, i) => { const on = (wdays.length ? wdays : [CAL_WD[wd]]).includes(c); return <button key={c} type="button" onClick={() => setWdays(w => { const cur = w.length ? w : [CAL_WD[wd]]; const n = cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c]; return n.length ? n : cur; })} title={CAL_WD_NAMES[i]} style={{width:34,height:30,borderRadius:7,border:`1px solid ${on ? C.accent : C.border}`,background:on ? C.accent : C.surface,color:on ? '#fff' : C.textMid,fontSize:12,fontWeight:700,cursor:'pointer'}}>{CAL_WD_NAMES[i][0]}{i === 2 || i === 4 ? CAL_WD_NAMES[i][1] : ''}</button>; })}
+            </div>
+          </div>
+        )}
+        {rep === 'MONTHLY' && (
+          <div style={{marginBottom:10,fontSize:12.5,color:C.text}}>
+            {[['date', `On day ${dom}`], ['nth', `On the ${CAL_ORD[nth]} ${CAL_WD_NAMES[wd]}`], ...(isLast ? [['last', `On the last ${CAL_WD_NAMES[wd]}`]] : [])].map(([v, l]) => (
+              <label key={v} style={{display:'flex',gap:6,alignItems:'center',padding:'2px 0',cursor:'pointer'}}><input type="radio" name="mmode" checked={mmode === v} onChange={() => setMmode(v)}/> {l}</label>
+            ))}
+          </div>
+        )}
+        {rep !== 'NONE' && (
+          <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
+            <div style={col('0 1 150px')}><span style={label}>Ends</span><select value={ends} onChange={e => setEnds(e.target.value)} style={input}><option value="never">Never</option><option value="until">On a date</option><option value="count">After a number of times</option></select></div>
+            {ends === 'until' && <div style={col('0 1 160px')}><input type="date" value={until} min={f.date} onChange={e => setUntil(e.target.value)} style={input}/></div>}
+            {ends === 'count' && <div style={{display:'flex',gap:6,alignItems:'center'}}><input type="number" min="1" max="500" value={count} onChange={e => setCount(e.target.value)} style={{...input,width:72}}/><span style={{fontSize:12.5,color:C.textMid}}>times</span></div>}
+          </div>
+        )}
+      </div>
+      {err && <div style={{fontSize:12.5,color:'#991b1b',marginBottom:8,lineHeight:1.5}}>{err}</div>}
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+        <Btn variant="secondary" onClick={onClose} style={{padding:'6px 14px',fontSize:12.5}}>Cancel</Btn>
+        <Btn onClick={save} disabled={busy || !f.title.trim() || !f.date} style={{padding:'6px 16px',fontSize:12.5}}>{busy ? 'Saving…' : 'Save'}</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+// The calendars Lateral reads: yours, ones you paste, and ones it finds on your government websites.
+function CalendarSources({ onChanged }) {
+  const [d, setD] = useState(null);
+  const [input, setInput] = useState('');
+  const [cands, setCands] = useState(null);
+  const [cat, setCat] = useState({});
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const apply = x => { if (x && !x.error) setD(x); };
+  useEffect(() => { calApi('sources/list').then(apply); }, []);
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.55};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:12,padding:0};
+  const sel = {...inputStyle,width:'auto',flex:'none',fontSize:12,padding:'4px 6px'};
+  const cats = (d && d.categories) || { event: 'Community events', food: 'Food and drink', meeting: 'Government meetings' };
+  const catSelect = (value, onChange) => <select value={value} onChange={e => onChange(e.target.value)} style={sel}>{Object.entries(cats).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>;
+  const kindName = { ics: 'Calendar feed', jsonld: 'Events page', tribe: 'Events API' };
+
+  async function look() {
+    if (!input.trim() || busy) return;
+    setBusy('look'); setErr(''); setNote(''); setCands(null);
+    const x = await calApi('sources/detect', { input, deep: true });
+    setBusy('');
+    if (x.error) { setErr(x.error); return; }
+    setCands(x.candidates || []);
+  }
+  async function add(c) {
+    setBusy('add:' + c.url); setErr('');
+    const x = await calApi('sources/add', { kind: c.kind, url: c.url, label: c.label, category: cat[c.url] || c.category });
+    setBusy('');
+    if (x.error) { setErr(x.error); return false; }
+    apply(x); onChanged();
+    return true;
+  }
+  async function find() {
+    setBusy('find'); setErr(''); setNote('');
+    const x = await calApi('sources/discover', {});
+    setBusy('');
+    if (x.error) { setErr(x.error); return; }
+    apply(x);
+    const n = (x.found || []).reduce((a, g) => a + g.candidates.length, 0);
+    setNote(n ? `Found ${n} calendar${n === 1 ? '' : 's'} on ${(x.found || []).filter(g => g.candidates.length).length} of ${x.checked} sites.` : `Looked at ${x.checked} government site${x.checked === 1 ? '' : 's'} and found no calendar feeds. Many city sites build their calendars so they cannot be read. If you know a "Subscribe" or "iCal" link, paste it above.`);
+  }
+  async function addAll() {
+    for (const g of (d.found || [])) for (const c of g.candidates) { await add(c); }
+  }
+  const change = async (id, patch) => { apply(await calApi('sources/update', { id, ...patch })); onChanged(); };
+  const remove = async id => { apply(await calApi('sources/remove', { id })); onChanged(); };
+  const refresh = async id => { setBusy('r' + id); apply(await calApi('sources/refresh', { id })); setBusy(''); onChanged(); };
+  const dismiss = async c => { apply(await calApi('sources/dismiss', { url: c.url })); };
+  const candRow = (c, k, afterAdd) => (
+    <div key={c.url + k} style={{padding:'8px 10px',margin:'6px 0',background:C.bg,border:`1px solid ${C.borderLight}`,borderRadius:8}}>
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 200px',minWidth:0}}>
+          <div style={{fontSize:12.5,fontWeight:800,color:C.text}}>{c.label}</div>
+          <div style={small}>{kindName[c.kind] || c.kind} · {c.count} upcoming{c.total > c.count ? ` (${c.total} in all)` : ''}</div>
+        </div>
+        {catSelect(cat[c.url] || c.category, v => setCat(x => ({ ...x, [c.url]: v })))}
+        <Btn onClick={async () => { if (await add(c) && afterAdd) afterAdd(); }} disabled={!!busy} style={{padding:'4px 12px',fontSize:12}}>{busy === 'add:' + c.url ? 'Adding…' : 'Add'}</Btn>
+      </div>
+      {(c.sample || []).map((s, i) => <div key={i} style={{...small,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{civicDate(s.date)}{s.time ? ' ' + calTime(s.time) : ''} · {s.title}</div>)}
+      {c.count === 0 && <div style={{...small,color:'#92400e'}}>Nothing is scheduled in the next three months, so this may be quiet or stale.</div>}
+    </div>
+  );
+  const foundCount = d ? (d.found || []).reduce((a, g) => a + g.candidates.length, 0) : 0;
+
+  return (
+    <div style={{padding:'12px 14px',marginBottom:14,background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10}}>
+      <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>Calendars Lateral reads</div>
+      {!d && <div style={small}>Loading…</div>}
+      {d && d.sources.length === 0 && <div style={{...small,marginBottom:6}}>None yet. Add a city, library, parks or venue calendar below, or let Lateral look through your government websites.</div>}
+      {d && d.sources.map(s => (
+        <div key={s.id} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'6px 0',borderTop:`1px solid ${C.borderLight}`}}>
+          <div style={{flex:'1 1 200px',minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</div>
+            <div style={{...small,color:s.error ? '#991b1b' : C.textMute}}>{kindName[s.kind] || s.kind} · {s.error ? 'could not update: ' + s.error : `${s.count} events`}</div>
+          </div>
+          {catSelect(s.category, v => change(s.id, { category: v }))}
+          <button onClick={() => refresh(s.id)} disabled={!!busy} style={{...link,fontWeight:600}}>{busy === 'r' + s.id ? '…' : '↻'}</button>
+          <button onClick={() => remove(s.id)} style={{...link,color:C.textMute,fontWeight:500}}>Remove</button>
+        </div>
+      ))}
+
+      <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.borderLight}`}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') look(); }} placeholder="Paste a calendar address, or any page that has a calendar (a city, library or venue site)" style={{...inputStyle,flex:'1 1 280px',fontSize:12.5,padding:'7px 10px'}}/>
+          <Btn variant="secondary" onClick={look} disabled={!!busy || !input.trim()} style={{padding:'6px 12px',fontSize:12}}>{busy === 'look' ? 'Looking…' : 'Look'}</Btn>
+        </div>
+        {cands && cands.map((c, k) => candRow(c, k, () => { setCands(null); setInput(''); }))}
+      </div>
+
+      <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.borderLight}`}}>
+        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+          <Btn variant="secondary" onClick={find} disabled={!!busy} style={{padding:'6px 12px',fontSize:12}}>{busy === 'find' ? 'Reading your government sites…' : d && d.foundAt ? '⌕ Look again for city calendars' : '⌕ Find city calendars for me'}</Btn>
+          {foundCount > 1 && <button onClick={addAll} disabled={!!busy} style={link}>Add all {foundCount}</button>}
+        </div>
+        <div style={{...small,marginTop:4}}>Looks through the websites Civic knows for your city, county, schools and state for calendar feeds. Nothing is added until you press Add.</div>
+        {note && <div style={{...small,marginTop:6,color:C.textMid}}>{note}</div>}
+        {d && (d.found || []).map(g => (g.candidates.length > 0 || g.note) && (
+          <div key={g.site.url} style={{marginTop:8}}>
+            <div style={{fontSize:12,fontWeight:800,color:C.text}}>{g.site.name}</div>
+            {g.candidates.map((c, k) => candRow(c, k, null))}
+            {g.candidates.length === 0 && <div style={small}>No feed found here.</div>}
+            {g.candidates.length > 0 && <button onClick={() => g.candidates.forEach(dismiss)} style={{...link,color:C.textMute,fontWeight:500,fontSize:11}}>Not interested</button>}
+          </div>
+        ))}
+      </div>
+      {err && <div style={{marginTop:8,fontSize:12,color:'#991b1b',lineHeight:1.5}}>{err}</div>}
+
+      {d && (
+        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${C.borderLight}`,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <span style={small}>Times are shown in</span>
+          <select value={d.tz} onChange={async e => { apply(await calApi('config', { tz: e.target.value })); onChanged(); }} style={sel}>{[...new Set([d.tz, ...CAL_ZONES])].map(z => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}</select>
+          {!d.tzSet && <span style={small}>(guessed from your state)</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CalendarCenter({ civic, onOpenCivic }) {
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(CAL_STORE) || '{}'); } catch { return {}; } })();
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [month, setMonth] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(12, 0, 0, 0); return d; });
+  const [view, setView] = useState(saved.view || (window.innerWidth < 700 ? 'agenda' : 'month'));
+  const [kinds, setKinds] = useState(saved.kinds || { vote: true, deadline: true, meeting: true, term: true });
+  const [sel, setSel] = useState(calDay(new Date()));
+  const [showSub, setShowSub] = useState(false);
+  const [sub, setSub] = useState({ token: '', base: window.location.origin, fromApp: false });
+  const [msg, setMsg] = useState('');
+  const [editor, setEditor] = useState(null);          // { initial, defaultDate } while the event editor is open
+  const [showCals, setShowCals] = useState(false);
+  const [confirmDel, setConfirmDel] = useState('');
+  const [nl, setNl] = useState('');                    // an event typed in plain words
+  const [nlBusy, setNlBusy] = useState(false);
+  const [nlErr, setNlErr] = useState('');
+  async function readSentence() {
+    if (!nl.trim() || nlBusy) return;
+    setNlBusy(true); setNlErr('');
+    const d = await calApi('event/parse', { text: nl });
+    setNlBusy(false);
+    if (d.error) { setNlErr(d.error); return; }
+    setEditor({ prefill: d.event, notes: d.event.notes || [] });
+  }
+  const [narrow, setNarrow] = useState(window.innerWidth < 700);
+  const store = patch => { try { localStorage.setItem(CAL_STORE, JSON.stringify({ view, kinds, ...patch })); } catch { /* not saved */ } };
+  const load = () => { setErr(''); fetch('/api/lateral/calendar/events').then(r => r.json()).then(d => { if (d.error) setErr(d.error); else setData(d); }).catch(e => setErr(e.message)); };
+  useEffect(() => { load(); }, [civic && civic.label]);
+  useEffect(() => { const f = () => setNarrow(window.innerWidth < 700); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
+  useEffect(() => {
+    if (!showSub || sub.token) return;
+    feedsJson('info').then(d => setSub(s => ({ ...s, token: d.token || '' })));
+    alertsJson('config').then(d => { if (d.config && d.config.appUrl) setSub(s => ({ ...s, base: d.config.appUrl, fromApp: true })); });
+  }, [showSub]);
+
+  const today = calDay(new Date());
+  const all = (data && data.events) || [];
+  const shown = all.filter(e => kinds[e.kind] !== false);
+  const byDay = useMemo(() => calByDay(shown), [data, kinds]);
+  const subUrl = sub.token ? `${sub.base.replace(/\/+$/, '')}/api/lateral/feed/${sub.token}/calendar.ics` : '';
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.55};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:12,padding:0};
+  const navBtn = {width:30,height:30,borderRadius:8,border:`1px solid ${C.border}`,background:C.surface,color:C.text,cursor:'pointer',fontSize:15,lineHeight:1,padding:0};
+  const wrap = {flex:1,minWidth:0,overflowY:'auto',padding:narrow ? '16px 14px 60px' : '22px 28px 60px',background:C.bg};
+  const card = {background:C.surface,border:`1px solid ${C.borderLight}`,borderRadius:10,padding:'14px 16px',marginBottom:14};
+
+  const shift = n => { const d = new Date(month); d.setMonth(d.getMonth() + n); setMonth(d); };
+  const goToday = () => { const d = new Date(); d.setDate(1); d.setHours(12, 0, 0, 0); setMonth(d); setSel(today); };
+  const setK = k => { const next = { ...kinds, [k]: !(kinds[k] !== false) }; setKinds(next); store({ kinds: next }); };
+  const setV = v => { setView(v); store({ view: v }); };
+
+  const cells = useMemo(() => {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+    const start = new Date(first); start.setDate(1 - first.getDay());
+    const rows = Math.ceil((first.getDay() + new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()) / 7);
+    return Array.from({ length: rows * 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+  }, [month]);
+
+  const pill = (e, k) => {
+    const c = (CAL_KINDS[e.kind] || {}).color || C.accent;
+    return (
+      <div key={e.id + k} title={e.title} style={{fontSize:10.5,lineHeight:'15px',fontWeight:700,color:'#fff',background:c,borderRadius:e.cont && !e.first ? (e.final ? '0 4px 4px 0' : 0) : (e.final ? 4 : '4px 0 0 4px'),padding:'0 5px',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',opacity:calDay(new Date()) > (e.endDate || e.date) ? 0.55 : 1}}>
+        {e.cont ? ' ' : (e.time ? calTime(e.time).replace(':00', '').replace(' ', '').toLowerCase() + ' ' : '') + e.title}
+      </div>
+    );
+  };
+  const openEdit = async e => {
+    const d = await calApi('event/get', { id: e.eventId });
+    if (d.error) { setErr(d.error); return; }
+    setEditor({ initial: d.event });
+  };
+  const delOne = async e => { setConfirmDel(''); await calApi('event/skip', { id: e.eventId, date: e.date }); load(); };
+  const delAll = async e => { setConfirmDel(''); await calApi('event/remove', { id: e.eventId }); load(); };
+  const detail = e => {
+    const c = (CAL_KINDS[e.kind] || {}).color || C.accent;
+    return (
+      <div key={e.id} style={{display:'flex',gap:10,padding:'8px 0',borderTop:`1px solid ${C.borderLight}`}}>
+        <div style={{width:4,borderRadius:2,background:c,flexShrink:0}}/>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:800,color:C.text,lineHeight:1.35}}>{e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer" style={{color:C.text,textDecoration:'none'}}>{e.title} <span style={{color:C.accent,fontWeight:700}}>↗</span></a> : e.title}</div>
+          <div style={small}><span style={{fontWeight:700,color:c}}>{(CAL_KINDS[e.kind] || {}).label || e.kind}</span>{e.time ? ' · ' + calTime(e.time) + (e.endTime && !(e.endDate && e.endDate > e.date) ? ' to ' + calTime(e.endTime) : '') : ''}{e.endDate && e.endDate > e.date ? ` · ${civicDate(e.date)} to ${civicDate(e.endDate)}` : ''}{e.group && e.kind !== 'mine' ? ' · ' + e.group : ''}{e.recurring ? ' · repeats' : ''}</div>
+          {e.location && <div style={small}>📍 {e.location}</div>}
+          {e.detail && <div style={{...small,color:C.textMid,whiteSpace:'pre-line'}}>{e.detail}</div>}
+          {e.editable && (
+            confirmDel === e.id
+              ? <div style={{...small,marginTop:3}}>{e.recurring ? 'Delete ' : 'Delete this event? '}{e.recurring && <><button onClick={() => delOne(e)} style={{...link,fontSize:11.5,color:'#b91c1c'}}>this day only</button> · <button onClick={() => delAll(e)} style={{...link,fontSize:11.5,color:'#b91c1c'}}>the whole series</button> · </>}{!e.recurring && <button onClick={() => delAll(e)} style={{...link,fontSize:11.5,color:'#b91c1c'}}>Yes, delete</button>} <button onClick={() => setConfirmDel('')} style={{...link,fontSize:11.5,color:C.textMute,fontWeight:500}}>Keep</button></div>
+              : <div style={{display:'flex',gap:12,marginTop:3}}><button onClick={() => openEdit(e)} style={{...link,fontSize:11.5}}>Edit{e.recurring ? ' series' : ''}</button><button onClick={() => setConfirmDel(e.id)} style={{...link,fontSize:11.5,color:C.textMute,fontWeight:500}}>Delete</button></div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Agenda: from today on, grouped by month then day.
+  const agenda = useMemo(() => {
+    const out = [];
+    for (const e of shown) { if ((e.endDate || e.date) < today) continue; const m = e.date < today ? today : e.date; let g = out.find(x => x.day === m); if (!g) { g = { day: m, list: [] }; out.push(g); } g.list.push(e); }
+    return out.sort((a, b) => a.day.localeCompare(b.day));
+  }, [data, kinds]);
+
+  if (civic === undefined) return <div style={wrap}><div style={{...small,maxWidth:900,margin:'0 auto'}}>Loading…</div></div>;
+
+  return (
+    <div style={wrap}>
+      <div style={{maxWidth:980,margin:'0 auto'}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap',marginBottom:4}}>
+          <div style={{fontSize:24,fontWeight:900,color:C.text,fontFamily:"'Playfair Display', Georgia, serif"}}>City calendar</div>
+          {civic && <div style={{fontSize:13,color:C.textMid}}>{civic.label}</div>}
+        </div>
+        <div style={{fontSize:12.5,color:C.textMid,lineHeight:1.6,marginBottom:12}}>Voting dates, deadlines, council and board meetings and terms of office from Civic, plus local events from calendars you add or Lateral finds for you, plus your own events. It is your city's calendar, not a replacement for your own.</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:nlErr ? 4 : 10}}>
+          <input value={nl} onChange={e => setNl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') readSentence(); }} placeholder={'Add in your own words: "2 for 1 tacos at Carnales every Tuesday"'} style={{...inputStyle,flex:'1 1 340px',fontSize:13,padding:'8px 12px'}}/>
+          <Btn onClick={readSentence} disabled={!nl.trim() || nlBusy} style={{padding:'6px 16px',fontSize:12.5}}>{nlBusy ? 'Reading…' : 'Add'}</Btn>
+        </div>
+        {nlErr && <div style={{fontSize:12,color:'#991b1b',lineHeight:1.5,marginBottom:10}}>{nlErr}</div>}
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+          <Btn variant="secondary" onClick={() => setEditor({ initial: null, defaultDate: sel })} style={{padding:'5px 14px',fontSize:12.5}}>+ Add event by hand</Btn>
+          <Btn variant="secondary" onClick={() => setShowCals(v => !v)} style={{padding:'5px 14px',fontSize:12.5}}>{showCals ? 'Hide calendars' : 'Calendars'}</Btn>
+        </div>
+        {showCals && <CalendarSources onChanged={load}/>}
+        {editor && <CalendarEventEditor initial={editor.initial} prefill={editor.prefill} notes={editor.notes} defaultDate={editor.defaultDate || sel} onClose={() => setEditor(null)} onSaved={ev => { setEditor(null); if (editor.prefill) setNl(''); if (ev && ev.date) { setSel(ev.date); const m = calFromDay(ev.date); m.setDate(1); setMonth(m); } load(); }}/>}
+
+        {data && data.needsProfile && <div style={card}><div style={{fontSize:13,color:C.text,marginBottom:6}}>The calendar is built from your Civic profile, which does not exist yet.</div>{onOpenCivic && <button onClick={onOpenCivic} style={link}>Set up Civic with your address →</button>}</div>}
+        {err && <div style={{...card,color:'#991b1b',fontSize:12.5}}>{err} <button onClick={load} style={link}>Try again</button></div>}
+        {!data && !err && <div style={small}>Gathering dates…</div>}
+
+        {data && !data.needsProfile && (
+          <>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
+              {view === 'month' && (
+                <>
+                  <button onClick={() => shift(-1)} style={navBtn} aria-label="Previous month">‹</button>
+                  <button onClick={() => shift(1)} style={navBtn} aria-label="Next month">›</button>
+                  <div style={{fontSize:16,fontWeight:800,color:C.text,minWidth:140}}>{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</div>
+                </>
+              )}
+              <Btn variant="secondary" onClick={goToday} style={{padding:'4px 12px',fontSize:12}}>Today</Btn>
+              <div style={{flex:1}}/>
+              <div style={{display:'flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden'}}>
+                {[['month', 'Month'], ['agenda', 'Agenda']].map(([v, l]) => <button key={v} onClick={() => setV(v)} style={{padding:'5px 12px',border:'none',cursor:'pointer',fontSize:12,fontWeight:700,background:view === v ? C.accent : C.surface,color:view === v ? '#fff' : C.textMid}}>{l}</button>)}
+              </div>
+            </div>
+
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+              {Object.entries(CAL_KINDS).map(([k, v]) => {
+                const on = kinds[k] !== false, n = all.filter(e => e.kind === k).length;
+                return <button key={k} onClick={() => setK(k)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'3px 10px',borderRadius:14,border:`1px solid ${on ? v.color : C.border}`,background:on ? v.color + '1f' : C.surface,color:on ? C.text : C.textMute,fontSize:11.5,fontWeight:700,cursor:'pointer'}}><span style={{width:9,height:9,borderRadius:'50%',background:on ? v.color : C.border}}/>{v.label}<span style={{color:C.textMute,fontWeight:600}}>{n}</span></button>;
+              })}
+            </div>
+
+            {view === 'month' && (
+              <div style={{...card,padding:narrow ? 6 : 10}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7, minmax(0, 1fr))',gap:narrow ? 2 : 4}}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(w => <div key={w} style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.06em',textAlign:'center',padding:'2px 0'}}>{narrow ? w[0] : w}</div>)}
+                  {cells.map(d => {
+                    const key = calDay(d), inMonth = d.getMonth() === month.getMonth(), list = byDay[key] || [], isSel = key === sel, isToday = key === today;
+                    return (
+                      <div key={key} onClick={() => setSel(key)} style={{minHeight:narrow ? 46 : 96,padding:narrow ? '3px 2px' : '4px 5px',borderRadius:7,cursor:'pointer',background:isSel ? C.accent + '18' : (inMonth ? 'transparent' : C.bg),border:`1px solid ${isSel ? C.accent : C.borderLight}`,opacity:inMonth ? 1 : 0.45,overflow:'hidden'}}>
+                        <div style={{fontSize:11.5,fontWeight:isToday ? 900 : 600,color:isToday ? '#fff' : C.text,display:'inline-block',minWidth:20,textAlign:'center',borderRadius:10,background:isToday ? C.accent : 'transparent',padding:'0 3px'}}>{d.getDate()}</div>
+                        {narrow
+                          ? <div style={{display:'flex',gap:2,flexWrap:'wrap',marginTop:3,justifyContent:'center'}}>{list.slice(0, 4).map((e, i) => <span key={e.id + i} style={{width:6,height:6,borderRadius:'50%',background:(CAL_KINDS[e.kind] || {}).color || C.accent}}/>)}</div>
+                          : <div>{list.slice(0, 3).map(pill)}{list.length > 3 && <div style={{fontSize:10,color:C.textMute,marginTop:2,fontWeight:700}}>+{list.length - 3} more</div>}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {view === 'month' && (
+              <div style={card}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:2}}>{calFromDay(sel).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}{sel === today ? ' · today' : ''}</div>
+                {(byDay[sel] || []).length === 0 ? <div style={small}>Nothing on the calendar for this day.</div> : (byDay[sel] || []).map(detail)}
+              </div>
+            )}
+
+            {view === 'agenda' && (
+              <div style={card}>
+                {agenda.length === 0 && <div style={small}>Nothing coming up with these filters.</div>}
+                {agenda.map((g, gi) => {
+                  const d = calFromDay(g.day), newMonth = gi === 0 || calFromDay(agenda[gi - 1].day).getMonth() !== d.getMonth();
+                  return (
+                    <div key={g.day}>
+                      {newMonth && <div style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',margin:gi ? '14px 0 4px' : '0 0 4px'}}>{d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</div>}
+                      <div style={{display:'flex',gap:12,padding:'6px 0',borderTop:`1px solid ${C.borderLight}`}}>
+                        <div style={{width:54,flexShrink:0,textAlign:'center'}}>
+                          <div style={{fontSize:10,fontWeight:800,color:g.day === today ? C.accent : C.textMute,textTransform:'uppercase'}}>{d.toLocaleDateString(undefined, { weekday: 'short' })}</div>
+                          <div style={{fontSize:20,fontWeight:900,color:g.day === today ? C.accent : C.text,lineHeight:1.1}}>{d.getDate()}</div>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>{g.list.map((e, i) => { const x = detail(e); return React.cloneElement(x, { style: { ...x.props.style, borderTop: i ? x.props.style.borderTop : 'none', paddingTop: i ? 8 : 0 } }); })}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={card}>
+              <button onClick={() => setShowSub(v => !v)} style={{...link,color:C.text}}>{showSub ? '▾' : '▸'} Subscribe in your calendar app</button>
+              {showSub && (
+                <div style={{marginTop:8}}>
+                  <div style={{...small,marginBottom:6}}>Add this address as a subscribed calendar in Apple Calendar, Google Calendar or Outlook, and these dates appear beside your own. It contains a secret, so keep it private.{!sub.fromApp && <> A calendar on another device needs an address it can reach: set <strong>Link back to</strong> under Settings → Alerts.</>}</div>
+                  {subUrl
+                    ? <div style={{display:'flex',gap:8}}><input readOnly value={subUrl} onFocus={e => e.target.select()} style={{...inputStyle,flex:1,fontSize:11.5}}/><Btn variant="secondary" onClick={() => setMsg(copyText(subUrl) ? 'Copied.' : 'Select the address and copy it.')} style={{padding:'4px 12px',fontSize:12}}>Copy</Btn></div>
+                    : <div style={small}>Loading…</div>}
+                  {msg && <div style={{...small,marginTop:4}}>{msg}</div>}
+                </div>
+              )}
+            </div>
+
+            <div style={{...small,fontSize:11}}>
+              {data.sources.map(s => <span key={s.id} style={{marginRight:12,display:'inline-block',maxWidth:'100%',color:s.ok ? C.textMute : '#991b1b'}}>{s.ok ? '✓' : '✕'} {s.name}{s.ok ? '' : ` (${s.error})`}</span>)}
+              <button onClick={load} style={{...link,fontSize:11,fontWeight:600}}>↻ Refresh</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Civic: voting dates and your ballot ──────────────────────────────────────
 // Dates come from the state in your profile (no address needed). The ballot itself comes from Google Civic and needs a free key
 // and your street address, which goes to Google for that one request.
@@ -7725,11 +8212,12 @@ const ICONS = {
   rss: <><path d="M5 5a14 14 0 0114 14"/><path d="M5 11a8 8 0 018 8"/><circle cx="6" cy="18" r="1.4" fill="currentColor"/></>,
   trend: <><path d="M4 16l5-5 4 4 7-8"/><path d="M15 7h5v5"/></>,
   coin: <><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.5 10.2c0-1 1-1.7 2.5-1.7s2.5.7 2.5 1.7-1 1.5-2.5 1.8-2.5.8-2.5 1.8 1 1.7 2.5 1.7 2.5-.7 2.5-1.7"/></>,
+  calendar: <><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></>,
   civic: <><path d="M3.5 9L12 4l8.5 5"/><path d="M5.5 10.5v6.5M10 10.5v6.5M14 10.5v6.5M18.5 10.5v6.5"/><path d="M3.5 20h17"/></>,
 };
 
 // The row of tool buttons in the top bar (used by both the desktop and the mobile layouts).
-function NavActions({ refreshingHL, refreshHLDone, refreshHLProg, onRefresh, briefNudge, onBrief, showNotebook, onNotebook, onMap }) {
+function NavActions({ refreshingHL, refreshHLDone, refreshHLProg, onRefresh, briefNudge, onBrief, calendarOn, onCalendar, showNotebook, onNotebook, onMap }) {
   const prog = `${(refreshHLProg && refreshHLProg.i) || 0}/${(refreshHLProg && refreshHLProg.total) || 0}`;
   return (
     <>
@@ -7741,6 +8229,9 @@ function NavActions({ refreshingHL, refreshHLDone, refreshHLProg, onRefresh, bri
       <button className="tb-btn" style={{'--tb':'#b86b4a'}} onClick={onBrief} title={briefNudge ? 'New coverage detected since your last brief — click to regenerate' : 'Open Intelligence Brief'}>
         <LIcon>{ICONS.brief}</LIcon>Brief
         {briefNudge && <span style={{position:'absolute',top:-3,right:-3,width:8,height:8,borderRadius:'50%',background:'#f59e0b',border:'1.5px solid var(--surface)',boxShadow:'0 0 0 1px #f59e0b'}}/>}
+      </button>
+      <button className="tb-btn" style={{'--tb':'#2563eb',...(calendarOn ? {background:'#2563eb22',borderColor:'#2563eb'} : {})}} onClick={onCalendar} title={calendarOn ? 'Close the city calendar' : 'City calendar: voting dates, deadlines and meetings'} aria-pressed={!!calendarOn}>
+        <LIcon>{ICONS.calendar}</LIcon>Calendar
       </button>
       {showNotebook && (
         <button className="tb-btn" style={{'--tb':'#0f766e'}} onClick={onNotebook} title="Export stories: PDF, Markdown or an Obsidian vault">
@@ -10369,6 +10860,7 @@ function FeedsPanel({ stories }) {
     ['Activity', 'Everything on your Activity list: prediction moves, resolution dates, new coverage.', `${root}/activity.xml`],
     ['All stories', 'New articles and episodes across every story you track.', `${root}/stories.xml`],
     ['Prediction flips', 'One item each time a prediction’s evidence changes direction. Quiet, and easy to scan.', `${root}/flips.xml`],
+    ['City calendar (for a calendar app, not a feed reader)', 'Voting dates, deadlines, council and board meetings and terms of office, as a calendar to subscribe to in Apple, Google or Outlook.', `${root}/calendar.ics`],
   ];
   const story = (stories || []).find(x => x.id === pick);
   const copy = url => setMsg(copyText(url) ? 'Copied.' : 'Select the address and copy it.');
@@ -15264,6 +15756,7 @@ function App() {
   const [aiLoading,setAiLoading]=useState(false);
   const [homeView,setHomeView]=useState(() => !getStoryIdFromUrl());
   const [activeView, setActiveView] = useState('stories'); // 'stories' | 'predictions' | 'library' | 'civic'
+  const [calendarOn, setCalendarOn] = useState(false);       // the city calendar takes over the center pane
   const [libKey, setLibKey] = useState(null);      // saved article open in the Library
   const [libStory, setLibStory] = useState('');     // Library list filter: '' all, '_none' unlinked, or a story id
   const [libTick, setLibTick] = useState(0);        // bumped when saved articles or their story links change
@@ -15437,7 +15930,8 @@ function App() {
   useEffect(() => { if (isMobile && activeView === 'civic' && civicSel) { setLeftPanelOpen(false); setMobileRightPanelOpen(true); } }, [civicSel]);
   useEffect(() => { if (isMobile && leftPanelOpen) setMobileRightPanelOpen(false); }, [leftPanelOpen]);
   useEffect(() => { if (isMobile && mobileRightPanelOpen) setLeftPanelOpen(false); }, [mobileRightPanelOpen]);
-  useEffect(() => { if (activeView === 'civic' && civic === undefined) civicJson('profile').then(d => setCivic(d.error ? null : (d.profile || null))); }, [activeView]);
+  useEffect(() => { if ((activeView === 'civic' || calendarOn) && civic === undefined) civicJson('profile').then(d => setCivic(d.error ? null : (d.profile || null))); }, [activeView, calendarOn]);
+  useEffect(() => { setCalendarOn(false); }, [selStory, activeView, homeView]);
   const openLibrary = (storyId) => { setActiveView('library'); setLeftPanelOpen(true); setLibKey(null); if (typeof storyId === 'string') setLibStory(storyId); setModal(null); };
 
   // Keyboard shortcuts. Ignored while typing in a field or when a modifier key is held.
@@ -16029,7 +16523,7 @@ function App() {
           {!isMobile && storiesView.some(s=>s.episodes?.length>0) && (
             <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,marginRight:8}}>
               <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
-                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} calendarOn={calendarOn} onCalendar={()=>setCalendarOn(v=>!v)} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
                 onMap={()=>setModal('map')}/>
             </div>
           )}
@@ -16055,7 +16549,7 @@ function App() {
           <div style={{display:'flex',flexWrap:'wrap',gap:8,paddingBottom:4}}>
             {storiesView.some(s=>s.episodes?.length>0) && (
               <NavActions refreshingHL={refreshingHL} refreshHLDone={refreshHLDone} refreshHLProg={refreshHLProg} onRefresh={refreshAllHeadlines}
-                briefNudge={briefNudge} onBrief={()=>setModal('brief')} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
+                briefNudge={briefNudge} onBrief={()=>setModal('brief')} calendarOn={calendarOn} onCalendar={()=>setCalendarOn(v=>!v)} showNotebook={NOTEBOOKLM_EXPORT_ENABLED} onNotebook={()=>setModal('export')}
                 onMap={()=>setModal('map')}/>
             )}
           </div>
@@ -16123,7 +16617,9 @@ function App() {
           </MobileDrawer>
         )}
         <div style={{flex:1,minWidth:0,display:'flex',overflow:'hidden'}}>
-          {activeView==='civic'
+          {calendarOn
+            ? <CalendarCenter civic={civic} onOpenCivic={()=>{setCalendarOn(false);setActiveView('civic');}}/>
+            : activeView==='civic'
             ? <CivicCenter civic={civic} selKey={civicSel} onSelect={setCivicSel} onChange={p => { setCivic(p); setCivicSel(null); }} onUpdate={setCivic} onAddStory={addStory} onOpenStory={openStoryById} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}}/>
             : activeView==='library'
             ? <LibraryCenter keyId={libKey} stories={storiesView} onSelectKey={setLibKey} onFilterStory={setLibStory} onOpenStory={id=>{const st=storiesView.find(x=>x.id===id); setActiveView(st&&st.predictionId?'predictions':'stories'); setSelStory(id); setSelEp(null); setHomeView(false);}} onChanged={()=>setLibTick(t=>t+1)} tick={libTick}/>
@@ -16132,7 +16628,7 @@ function App() {
             : <CenterPanel onOpenLibrary={openLibrary} story={story} selEpId={selEp} onSelEp={id=>setSelEp(id)} onAddEp={()=>setModal('addEpisode')} onDiscover={()=>setModal('discover')} onRegen={handleRegen} aiLoading={aiLoading} onDeleteEp={deleteEpisode} settings={settings} onAddFromHeadline={addEpisodeFromHeadline} onAddPodcast={addEpisodeFromPodcast} onStoryRefreshed={touchStoryUpdatedAt} onSaveBriefAsEpisode={addEpisodeFromBrief} onBackfill={()=>setModal('backfill')} onUpdateStory={updateStory}/>
           }
         </div>
-        {!isMobile && (
+        {!isMobile && !calendarOn && (
           <RightPanel story={story} ep={ep} onDeleteEp={deleteEpisode} onUpdateEp={updateEpisode} settings={settings} stories={storiesView} onAddStory={addStory} onAddEpisode={addEpisode} onResolveStory={resolveStory} onDeleteStory={deleteStory} onPopOut={setFloatingPlayer} onWidthChange={setRightPanelWidth} civicNode={civicPanel}/>
         )}
         {isMobile && (

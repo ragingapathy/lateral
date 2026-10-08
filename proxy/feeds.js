@@ -341,6 +341,7 @@ async function route(req, reqUrl, res, send) {
       const entries = newestFirst(stories.flatMap(s => s.predictionId ? predictionEntries(s) : storyEntries(s, cacheJson))).slice(0, 150);
       return sendXml(res, 'application/atom+xml', atom({ title: 'Lateral: all stories', id: 'tag:lateral,2026:stories', subtitle: 'New coverage and episodes across the stories you track', link: appBase(), entries }));
     }
+    if (what === 'calendar.ics') { try { return sendXml(res, 'text/calendar', await require('./calendar').icsFile()); } catch { res.writeHead(502, { 'Content-Type': 'text/plain' }); return res.end('The calendar is not available right now'); } }
     if (what === 'flips.xml') return sendXml(res, 'application/atom+xml', atom({ title: 'Lateral: prediction flips', id: 'tag:lateral,2026:flips', subtitle: "Each time a prediction's evidence changed direction", link: appBase(), entries: newestFirst(flipEntries()).slice(0, 100) }));
     const pm = what.match(/^prediction\/([^/]+)\.xml$/);
     if (pm) {

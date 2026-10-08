@@ -106,6 +106,51 @@ the left-hand panel, so the center no longer repeats them. The page reads top to
 the other local offices, boards and agendas, and what you are watching. Between the map and the news sits **Voting dates and your
 ballot** (below).
 
+### City calendar
+
+The **Calendar** button next to Brief opens a full-width calendar in place of the center pane (open any story, Home or a left-panel view
+to leave it). Step one shows the civic dates Lateral already knows: voting dates and deadlines for your state, council and board
+meetings (from Legistar, Granicus and feeds, whether or not you watch them), federal rule comment deadlines, and the day a term of
+someone who represents you ends. Switch between **Month** and **Agenda**, filter by kind, and click a day for its details. Each
+source is listed at the bottom with a tick or the reason it did not answer. **Subscribe in your calendar app** gives a private
+`calendar.ics` address (it contains the same secret as your feeds) to add to Apple, Google or Outlook calendar. A calendar on another
+device needs an address it can reach: set *Link back to* under Settings → Alerts.
+
+**Local events.** Press **Calendars** to add calendars Lateral reads, each tagged as community events, food and drink, or government
+meetings. Lateral reads only what an organisation publishes for the purpose:
+
+- an **iCalendar feed** (`.ics` or `webcal://`): most city, county, library, parks and school calendars, Google Calendar's public
+  address, and the per-department subscribe links on CivicPlus sites such as a county's;
+- a public **events page** whose events carry schema.org markup (the data search engines read);
+- a WordPress site running **The Events Calendar**, through its public REST API.
+
+Paste any address (a feed, or a site and Lateral looks for the calendar on it), or press **Find city calendars for me** to look through
+the government websites Civic knows for your city, county, schools and state. Nothing is added until you press Add, feeds with nothing
+scheduled are not suggested, and each calendar can be re-tagged, refreshed or removed. Calendars refresh every six hours and keep
+their last good copy if a site is down. Platforms whose terms forbid copying their listings (event hubs such as CitySpark) are
+deliberately not supported. Times from a feed are converted to your city's time zone (guessed from your state; change it under
+Calendars).
+
+**Your own events.** Type one in your own words in the bar at the top of the Calendar ("2 for 1 tacos at Carnales every Tuesday", "trivia at the
+Pub Thursdays 7 to 9pm", "book sale Nov 14-15"). The local model reads the sentence into a draft, Lateral works out the dates itself (models are
+unreliable at that), and you check the draft, with a short note on how it was read, before saving. Nothing leaves your computer. Or use
+**+ Add event by hand**. Either way you can make one-off or **repeating** events, typed as personal, food and drink, or community: daily, weekly (pick the days), monthly (on a date, on the
+second Tuesday, or on the last Friday) or yearly, every N periods, ending never, on a date or after N times. Delete a single day or
+the whole series. Your events live in `data/calendar-sources.json` and are included in the subscribable calendar file.
+
+### What Lateral will and will not read
+
+Lateral is meant to be run by many people, so its calendar sources follow a few rules:
+
+- **Only what a publisher offers for this purpose:** calendar feeds, schema.org event markup and public event APIs. Each copy of Lateral
+  reads sources directly from your computer; nothing is collected centrally.
+- **robots.txt is respected** for web pages (not for feed addresses you paste, which exist to be subscribed to). A page a site asks
+  automated tools not to read is not read, and a site behind bot protection is reported as unreadable rather than worked around.
+- **Some listings are out of reach on purpose:** platforms whose terms forbid copying them (CitySpark, Eventbrite). If a venue lists
+  events there, ask for the venue's own calendar feed.
+- **Every event shows where it came from**, with a link back. Add a source only if you are comfortable with its terms; Lateral cannot
+  check them for you.
+
 ### Voting dates and your ballot
 
 Two parts with different needs.
@@ -326,6 +371,7 @@ as you use the app, and is **git-ignored** — only `.gitkeep` and `llm-secrets.
 | `podcast-worker.json` | Optional address and token of the transcription helper (**secret**). Environment variables win over this file. |
 | `archive/` | Saved copies of articles (one JSON file each, plus `index.json`). Not part of the Settings → Status export; copy this folder to back it up. |
 | `civic-track.json` | The bills you follow as predictions: which bill each prediction tracks, what would settle it, and the official actions seen so far. Not part of the Settings → Status export. |
+| `calendar-sources.json` · `calendar-cache.json` | The calendars you added, your own events (with repeat rules), calendar suggestions, and each calendar's last good copy. Not part of the Settings → Status export. |
 | `civic-ballot.json` | Your last ballot from Google Civic, any plain-language notes, and your address only if you chose to remember it. Not part of the Settings → Status export. |
 | `civic-media.json` | Local media for your place: what was read from Wikipedia (kept for a month), outlets you added, and ones you hid. Not part of the Settings → Status export. |
 | `civic-boards.json` | The boards you added under Boards and agendas (Legistar, Granicus or feed addresses), and suggestions you dismissed. Not part of the Settings → Status export. |
@@ -389,6 +435,8 @@ The proxy exposes a plain JSON API, so scripts and other tools can drive Lateral
 | `GET /api/lateral/civic/profile` · `POST /civic/lookup` `{"address": …}` · `/civic/refresh` · `/civic/legistar` `{"url": …}` · `/civic/remove` | Read the Civic profile; build one from a street address (the address is not stored); re-check officials without an address; point at (or confirm) the city's Legistar site; delete the profile. |
 | `GET /api/lateral/civic/watch/list` · `GET /civic/watch/items?kind=` | The watches available for your profile (`council`, `delegation`, `state`, `rules`), whether each is on, and key status; one watch's current items. |
 | `GET /api/lateral/civic/track/preview?item=` · `GET /civic/track/get?predictionId=` · `GET /civic/track/list` | What following a bill would create (targets, resolution date, starting confidence, latest actions); the official record behind a tracked prediction; all tracked predictions. `item` is a watch item id such as `bill:119-HR-1`, `os:ocd-bill/…` or `matter:44496`. |
+| `GET /api/lateral/calendar/sources/list` · `POST /calendar/sources/{detect,add,update,remove,refresh,discover,dismiss}` · `POST /calendar/event/{get,save,remove,skip}` · `POST /calendar/config` | Calendars Lateral reads (detect looks at an address without adding it; discover looks through your government websites), your own events, and the time zone. |
+| `GET /api/lateral/calendar/events` · `GET /feed/<token>/calendar.ics` | The city calendar: `events` (`{id,date,endDate?,time?,title,kind,group,url,detail}`, kinds `vote` `deadline` `meeting` `term`) and `sources` saying which answered; the `.ics` is the same events as a subscribable calendar. |
 | `GET /api/lateral/civic/ballot/status` · `POST /civic/ballot/lookup` `{"address","remember"}` · `/ballot/refresh` · `/ballot/forget` · `/ballot/explain` `{"id"}` | Voting dates for your state and your ballot from Google Civic (needs `googleCivicApiKey`); forget drops the cached ballot and any remembered address; explain writes a neutral note for one measure. |
 | `GET /api/lateral/civic/media/list` · `POST /civic/media/refresh` · `/media/add` `{"name","url","kind"}` · `/media/remove` `{"id"}` · `/media/hide` · `/media/restore` `{"key"}` · `/media/search` | Local media: outlets grouped as `paper`, `tv`, `radio` and `online` with look-up links; read Wikipedia again; add, remove, hide or restore one; an opt-in web search for more (one Tavily credit, nothing saved). |
 | `GET /api/lateral/civic/boards/list` · `POST /civic/boards/suggest` · `/boards/preview` `{"input"}` · `/boards/add` · `/boards/remove` `{"id"}` · `/boards/dismiss` | Boards and agendas: your boards; look for a county Legistar site (probes only, nothing added); see what a pasted address would give (`kind` `legistar`, `granicus` or `feed`, with a few items, or the feeds found on a page); add one (`{"kind":"legistar","slug"}`, `{"kind":"granicus","host","viewId"}` or `{"kind":"feed","url"}`, with `scope` of `county`, `school`, `city` or `other`); remove or dismiss one. Each board is also a watch with kind `board:<id>`. |
@@ -448,6 +496,11 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
   fallback card by design.
 
 ## What's new
+
+**v2.5 — City calendar.** A Calendar view next to Brief: voting dates, deadlines, council and board meetings and terms of office; local
+events from calendar feeds you add or Lateral finds on your government websites (it respects robots.txt and tells you plainly when a site
+blocks automated readers); and your own events, one-off or repeating, which you can simply type ("2 for 1 tacos at Carnales every
+Tuesday") and the local model drafts for you to check. Month and agenda layouts, kind filters and a subscribable calendar file.
 
 **v2.4 — Civic: voting dates and your ballot, and a clearer media menu.** A new Civic card shows your state's voting dates (Ohio so far) and, with a free Google
 Civic key and your address, the measures, races, early-voting sites and polling place on your ballot, with optional plain-language
