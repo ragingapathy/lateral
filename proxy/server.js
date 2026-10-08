@@ -4326,6 +4326,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith('/archive/') || pathname.startsWith('/api/lateral/archive/')) {
     if (await archive.route(req, reqUrl, res, send) !== false) return;
   }
+  if (/^(\/api\/lateral)?\/foryou(\/|$)/.test(pathname)) {
+    if (await require('./foryou').route(req, reqUrl, res, send) !== false) return;
+  }
   if (/^(\/api\/lateral)?\/calendar\//.test(pathname)) {
     if (await require('./calendar').route(req, reqUrl, res, send) !== false) return;
   }
@@ -4544,6 +4547,16 @@ function scheduleAutoRefresh() {
 }
 
 scheduleAutoRefresh();
+
+// "For you" (the top of Home) gathers alerts, the calendar and a daily podcast pass. The pass reuses the same podcast search the app uses.
+require('./foryou').init({
+  searchPodcasts: async (q, limit = 12) => {
+    let out = {};
+    const capture = { headersSent: false, writeHead() {}, end(b) { try { out = JSON.parse(b); } catch { out = {}; } this.headersSent = true; } };
+    await handlePodcasts(new URL('http://localhost/api/lateral/podcasts?q=' + encodeURIComponent(q) + '&limit=' + limit), capture);
+    return out.podcasts || [];
+  },
+});
 
 // ─── Headline sweep ──────────────────────────────────────────────────────────
 // Re-checks the headlines already cached for every active story (the Home feed shows them): articles that were stored before the

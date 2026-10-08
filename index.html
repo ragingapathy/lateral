@@ -14202,7 +14202,129 @@ function PredictionsPanel() {
   );
 }
 
-function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode, onSelectStory, refreshing, refreshProg, refreshDone, refreshLog }) {
+// ── For you: the top of Home ─────────────────────────────────────────────────
+// What moved on your stories, what is coming up this week, today's podcast picks, and what happened in Civic. It only gathers what
+// Lateral already knows, keeps every list short, and says so when nothing happened.
+const FORYOU_STORE = 'lateral-foryou-v1';
+function ForYou({ stories, onSelectStory, onOpenCalendar, onPlayAudio }) {
+  const [d, setD] = useState(null);
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(FORYOU_STORE) !== 'closed'; } catch { return true; } });
+  const [gone, setGone] = useState({});
+  const alive = useRef(true);
+  const load = () => fetch('/api/lateral/foryou').then(r => r.json()).then(x => { if (alive.current && !x.error) setD(x); return x; }).catch(() => null);
+  useEffect(() => {
+    alive.current = true;
+    let tries = 0, timer = null;
+    const tick = async () => { const x = await load(); if (!alive.current) return; if (x && x.pending && tries++ < 8) timer = setTimeout(tick, 15000); };
+    tick();
+    const every = setInterval(load, 5 * 60000);
+    return () => { alive.current = false; clearTimeout(timer); clearInterval(every); };
+  }, []);
+  const toggle = () => setOpen(o => { const n = !o; try { localStorage.setItem(FORYOU_STORE, n ? 'open' : 'closed'); } catch { /* not saved */ } return n; });
+  const storyOk = id => !!id && (stories || []).some(s => s.id === id);
+
+  const small = {fontSize:11.5,color:C.textMute,lineHeight:1.5};
+  const link = {background:'none',border:'none',cursor:'pointer',color:C.accent,fontWeight:700,fontSize:11.5,padding:0};
+  const card = color => ({background:C.surface,border:`1px solid ${C.borderLight}`,borderTop:`3px solid ${color}`,borderRadius:10,padding:'11px 13px',minWidth:0});
+  const head = (color, label, count) => (
+    <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:6}}>
+      <span style={{width:8,height:8,borderRadius:'50%',background:color,flexShrink:0}}/>
+      <span style={{fontSize:10,fontWeight:800,color:C.textMute,textTransform:'uppercase',letterSpacing:'0.07em',flex:1}}>{label}</span>
+      {count > 0 && <span style={{fontSize:10.5,fontWeight:800,color:'#fff',background:color,borderRadius:9,padding:'0 7px',lineHeight:'16px'}}>{count}</span>}
+    </div>
+  );
+  const dayLabel = day => {
+    if (!d) return day;
+    if (day === d.today) return 'Today';
+    const t = new Date(day + 'T12:00:00'), n = new Date(d.today + 'T12:00:00');
+    if (Math.round((t - n) / 86400000) === 1) return 'Tomorrow';
+    return t.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '');
+  };
+  const timeLabel = t => { const m = String(t || '').match(/^(\d{2}):(\d{2})$/); if (!m) return ''; const h = Number(m[1]); return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`; };
+  async function notForMe(p) {
+    setGone(g => ({ ...g, [p.key]: true }));
+    try { await podPost('feedback', { storyId: p.storyId, key: p.key, hidden: true }); } catch { /* it stays hidden for this view */ }
+  }
+
+  const picks = ((d && d.podcasts) || []).filter(p => !gone[p.key]);
+  const cards = [];
+  if (d) {
+    if (d.moved.length) cards.push(
+      <div key="moved" style={card('#d97706')}>
+        {head('#d97706', 'Moved', d.moved.length)}
+        {d.moved.map(m => (
+          <div key={m.id} style={{padding:'5px 0',borderTop:`1px solid ${C.borderLight}`}}>
+            <div onClick={() => storyOk(m.storyId) && onSelectStory(m.storyId)} style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35,cursor:storyOk(m.storyId) ? 'pointer' : 'default'}}>{m.title}</div>
+            <div style={small}>{timeAgo(m.at)}{m.severity === 'important' ? ' · important' : ''}{m.body ? ' · ' + m.body : ''}</div>
+          </div>
+        ))}
+      </div>
+    );
+    if (d.coming.length) cards.push(
+      <div key="coming" style={card('#2563eb')}>
+        {head('#2563eb', 'Coming up', d.coming.length)}
+        {d.coming.map(c => (
+          <div key={c.id} style={{display:'flex',gap:9,padding:'5px 0',borderTop:`1px solid ${C.borderLight}`,alignItems:'baseline'}}>
+            <div style={{width:70,flexShrink:0,fontSize:11.5,fontWeight:800,color:c.date === d.today ? '#2563eb' : C.textMid}}>{dayLabel(c.date)}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12.5,fontWeight:600,color:C.text,lineHeight:1.35}}>{c.title}</div>
+              {(c.time || c.group) && <div style={small}>{[timeLabel(c.time), c.group].filter(Boolean).join(' · ')}</div>}
+            </div>
+          </div>
+        ))}
+        {onOpenCalendar && <div style={{marginTop:6}}><button onClick={onOpenCalendar} style={link}>Open the calendar →</button></div>}
+      </div>
+    );
+    if (picks.length || d.pending || d.podcastError) cards.push(
+      <div key="pods" style={card('#7c3aed')}>
+        {head('#7c3aed', 'Worth a listen', picks.length)}
+        {picks.map(p => (
+          <div key={p.key} style={{padding:'6px 0',borderTop:`1px solid ${C.borderLight}`}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35}}>{p.ep.title}</div>
+            <div style={small}>{p.ep.podcastTitle} · for {p.storyTitle}</div>
+            {p.why && <div style={{...small,fontStyle:'italic'}}>{p.why}</div>}
+            <div style={{display:'flex',gap:12,marginTop:3}}>
+              {p.ep.audioUrl && onPlayAudio && <button onClick={() => onPlayAudio({ audioUrl: p.ep.audioUrl, title: p.ep.title, showName: p.ep.podcastTitle || 'Podcast', imageUrl: p.ep.imageUrl })} style={link}>▶ Play</button>}
+              {p.ep.url && <a href={p.ep.url} target="_blank" rel="noopener noreferrer" style={{...link,textDecoration:'none'}}>Open ↗</a>}
+              <button onClick={() => notForMe(p)} style={{...link,color:C.textMute,fontWeight:500}}>Not for me</button>
+            </div>
+          </div>
+        ))}
+        {!picks.length && <div style={small}>{d.podcastError || (d.pending ? 'Picking today’s episodes…' : 'No episodes stood out today.')}</div>}
+      </div>
+    );
+    if (d.civic.length) cards.push(
+      <div key="civic" style={card('#059669')}>
+        {head('#059669', 'Civic', d.civic.length)}
+        {d.civic.map(m => (
+          <div key={m.id} style={{padding:'5px 0',borderTop:`1px solid ${C.borderLight}`}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35}}>{m.title}</div>
+            <div style={small}>{timeAgo(m.at)}{m.body ? ' · ' + m.body : ''}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionToggleButton onClick={toggle}>
+        <span style={HOME_TITLE_LARGE}>For you</span>
+        <div style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center'}}>
+          {d && d.asOf && <span style={{fontSize:11,color:C.textMute}}>{d.pending ? 'updating…' : 'as of ' + new Date(d.asOf).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>}
+          <span style={HOME_CHEVRON}>{open ? '▾' : '▸'}</span>
+        </div>
+      </SectionToggleButton>
+      {open && (
+        !d ? <div style={small}>Gathering what matters…</div>
+        : cards.length === 0 ? <div style={{...small,padding:'6px 2px'}}>Nothing new for you right now. Quiet is good: stories that move, deadlines and meetings this week, and podcast picks show up here.</div>
+        : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(250px, 1fr))',gap:12}}>{cards}</div>
+      )}
+    </div>
+  );
+}
+
+function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode, onSelectStory, onOpenCalendar, onPlayAudio, refreshing, refreshProg, refreshDone, refreshLog }) {
   const latestRunByStory = React.useMemo(() => {
     const m = {};
     (refreshLog?.runs?.[0]?.stories || []).forEach(s => { m[s.id] = s; });
@@ -14612,6 +14734,7 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
       </div>
 
       <div style={{flex:1, overflowY:'auto', padding:'20px 24px 80px', display:'flex', flexDirection:'column', gap:20}}>
+        <ForYou stories={stories} onSelectStory={onSelectStory} onOpenCalendar={onOpenCalendar} onPlayAudio={onPlayAudio}/>
 
         {/* Search results */}
         {searchPhase !== 'idle' && (
@@ -16624,7 +16747,7 @@ function App() {
             : activeView==='library'
             ? <LibraryCenter keyId={libKey} stories={storiesView} onSelectKey={setLibKey} onFilterStory={setLibStory} onOpenStory={id=>{const st=storiesView.find(x=>x.id===id); setActiveView(st&&st.predictionId?'predictions':'stories'); setSelStory(id); setSelEp(null); setHomeView(false);}} onChanged={()=>setLibTick(t=>t+1)} tick={libTick}/>
             : homeView
-            ? <HomePanel stories={storiesView} settings={settings} serverReady={serverReady} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}} onAddEpisode={addEpisodeFromCard} onSelectStory={id=>{setSelStory(id);setHomeView(false);}} refreshing={refreshingHL} refreshProg={refreshHLProg} refreshDone={refreshHLDone} refreshLog={refreshLog}/>
+            ? <HomePanel stories={storiesView} settings={settings} serverReady={serverReady} onStartStory={a=>{setPrefillArticle(a);setModal('addStory');}} onAddEpisode={addEpisodeFromCard} onSelectStory={id=>{setSelStory(id);setHomeView(false);}} onOpenCalendar={()=>setCalendarOn(true)} onPlayAudio={setFloatingPlayer} refreshing={refreshingHL} refreshProg={refreshHLProg} refreshDone={refreshHLDone} refreshLog={refreshLog}/>
             : <CenterPanel onOpenLibrary={openLibrary} story={story} selEpId={selEp} onSelEp={id=>setSelEp(id)} onAddEp={()=>setModal('addEpisode')} onDiscover={()=>setModal('discover')} onRegen={handleRegen} aiLoading={aiLoading} onDeleteEp={deleteEpisode} settings={settings} onAddFromHeadline={addEpisodeFromHeadline} onAddPodcast={addEpisodeFromPodcast} onStoryRefreshed={touchStoryUpdatedAt} onSaveBriefAsEpisode={addEpisodeFromBrief} onBackfill={()=>setModal('backfill')} onUpdateStory={updateStory}/>
           }
         </div>

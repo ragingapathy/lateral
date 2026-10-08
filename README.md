@@ -85,6 +85,16 @@ for the AI parts; cloud LLM providers are optional.
   article, reads the page, recovers bot-blocked pages with Tavily, and runs every candidate past a small vision model so logos,
   tiny thumbnails and unrelated images are rejected. Anything left shows a clean fallback card.
 
+## For you
+
+The top of **Home** is a short "For you" section (collapsible, and quiet when nothing happened). It adds no new sources; it gathers what
+Lateral already knows into four small cards: **Moved** (stories with new coverage and predictions whose evidence shifted, last three
+days), **Coming up** (the next seven days from the calendar, plus predictions that come due), **Worth a listen** (today's podcast picks)
+and **Civic** (votes, committee action and meeting notices from your watches). Podcast picks come from a daily background pass: for each
+active story Lateral searches podcasts, the local model scores the episodes, and the best few are kept (at most two per story, nothing older
+than three weeks, stories that only carry Civic watch items are skipped). Play an episode in the floating player, open it, or press **Not
+for me** to hide it for good. Nothing is transcribed automatically.
+
 ## Civic: who represents you
 
 Open the **Civic** tab in the left panel (or press `c`) and enter one street address. Lateral finds your congressional, state senate
@@ -371,6 +381,7 @@ as you use the app, and is **git-ignored** — only `.gitkeep` and `llm-secrets.
 | `podcast-worker.json` | Optional address and token of the transcription helper (**secret**). Environment variables win over this file. |
 | `archive/` | Saved copies of articles (one JSON file each, plus `index.json`). Not part of the Settings → Status export; copy this folder to back it up. |
 | `civic-track.json` | The bills you follow as predictions: which bill each prediction tracks, what would settle it, and the official actions seen so far. Not part of the Settings → Status export. |
+| `foryou.json` | Today's podcast picks (rebuilt daily). Not part of the Settings → Status export. |
 | `calendar-sources.json` · `calendar-cache.json` | The calendars you added, your own events (with repeat rules), calendar suggestions, and each calendar's last good copy. Not part of the Settings → Status export. |
 | `civic-ballot.json` | Your last ballot from Google Civic, any plain-language notes, and your address only if you chose to remember it. Not part of the Settings → Status export. |
 | `civic-media.json` | Local media for your place: what was read from Wikipedia (kept for a month), outlets you added, and ones you hid. Not part of the Settings → Status export. |
@@ -435,6 +446,7 @@ The proxy exposes a plain JSON API, so scripts and other tools can drive Lateral
 | `GET /api/lateral/civic/profile` · `POST /civic/lookup` `{"address": …}` · `/civic/refresh` · `/civic/legistar` `{"url": …}` · `/civic/remove` | Read the Civic profile; build one from a street address (the address is not stored); re-check officials without an address; point at (or confirm) the city's Legistar site; delete the profile. |
 | `GET /api/lateral/civic/watch/list` · `GET /civic/watch/items?kind=` | The watches available for your profile (`council`, `delegation`, `state`, `rules`), whether each is on, and key status; one watch's current items. |
 | `GET /api/lateral/civic/track/preview?item=` · `GET /civic/track/get?predictionId=` · `GET /civic/track/list` | What following a bill would create (targets, resolution date, starting confidence, latest actions); the official record behind a tracked prediction; all tracked predictions. `item` is a watch item id such as `bill:119-HR-1`, `os:ocd-bill/…` or `matter:44496`. |
+| `GET /api/lateral/foryou` · `POST /foryou/refresh` | The For you section: `moved`, `coming`, `civic` and `podcasts`; the podcast pass refreshes in the background when its picks are over 20 hours old. |
 | `GET /api/lateral/calendar/sources/list` · `POST /calendar/sources/{detect,add,update,remove,refresh,discover,dismiss}` · `POST /calendar/event/{get,save,remove,skip}` · `POST /calendar/config` | Calendars Lateral reads (detect looks at an address without adding it; discover looks through your government websites), your own events, and the time zone. |
 | `GET /api/lateral/calendar/events` · `GET /feed/<token>/calendar.ics` | The city calendar: `events` (`{id,date,endDate?,time?,title,kind,group,url,detail}`, kinds `vote` `deadline` `meeting` `term`) and `sources` saying which answered; the `.ics` is the same events as a subscribable calendar. |
 | `GET /api/lateral/civic/ballot/status` · `POST /civic/ballot/lookup` `{"address","remember"}` · `/ballot/refresh` · `/ballot/forget` · `/ballot/explain` `{"id"}` | Voting dates for your state and your ballot from Google Civic (needs `googleCivicApiKey`); forget drops the cached ballot and any remembered address; explain writes a neutral note for one measure. |
@@ -496,6 +508,9 @@ Optional local routes: a git-ignored `proxy/v2.local.js` may export `route(req, 
   fallback card by design.
 
 ## What's new
+
+**v2.5.2 — For you.** A short "For you" section at the top of Home: what moved on your stories, what is coming up this week, today's
+podcast picks and what happened in Civic.
 
 **v2.5 — City calendar.** A Calendar view next to Brief: voting dates, deadlines, council and board meetings and terms of office; local
 events from calendar feeds you add or Lateral finds on your government websites (it respects robots.txt and tells you plainly when a site
