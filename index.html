@@ -206,6 +206,11 @@
     @media (max-width: 768px) {
       html, body { touch-action: pan-y; }
     }
+    /* Home article feeds: one readable card per row on phones and narrow tablets. */
+    .home-article-grid > * { min-width: 0; }
+    @media (max-width: 900px) {
+      .home-article-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 16px !important; }
+    }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -6033,6 +6038,36 @@ async function archiveJson(pathAndQuery, opts) {
 const archivePost = (p, body) => archiveJson(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
 
 // Reads one saved article. `inline` renders it without its own modal (used inside the Library).
+// Local narration is generated once; ordinary browser read-aloud remains available.
+async function articleAudioRequest(action, key, voice, post = false) {
+  const r = await fetch('/api/lateral/article-audio/' + action + (post ? '' : '?key=' + encodeURIComponent(key) + '&voice=' + encodeURIComponent(voice)), post ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,voice})} : {cache:'no-store'});
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Narration unavailable.');
+  return d;
+}
+function ArticleAudio({ doc }) {
+  const [voice, setVoice] = useState('HermesVoice'), [status, setStatus] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [voices, setVoices] = useState(null);
+  const player = useRef(null), request = useRef(0);
+  const [browserVoices,setBrowserVoices]=useState([]),[browserVoice,setBrowserVoice]=useState('');
+  useEffect(()=>{const load=()=>{const list=(window.speechSynthesis?.getVoices()||[]).filter(v=>/^en\b/i.test(v.lang));setBrowserVoices(list);setBrowserVoice(current=>current||list.find(v=>/Google.*English|Google US/i.test(v.name))?.voiceURI||'');};load();window.speechSynthesis?.addEventListener('voiceschanged',load);return()=>window.speechSynthesis?.removeEventListener('voiceschanged',load);},[]);
+  useEffect(() => { let alive=true; fetch('/api/lateral/article-audio/voices',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(alive)setVoices(d);}).catch(()=>{if(alive)setVoices({available:false});});return()=>{alive=false;}; }, []);
+  useEffect(() => { const run=++request.current; let timer; setStatus(null);setError('');setBusy(false);
+    const tick=async()=>{try{const d=await articleAudioRequest('status',doc.key,voice);if(request.current!==run)return;setStatus(d);if(['queued','generating'].includes(d.state))timer=setTimeout(tick,3000);}catch(e){if(request.current===run)setError(e.message);}};
+    tick(); const refresh=()=>{clearTimeout(timer);tick();};window.addEventListener('lateral-narration-updated',refresh);
+    return()=>{++request.current;clearTimeout(timer);window.removeEventListener('lateral-narration-updated',refresh);};
+  }, [doc.key,voice]);
+  async function command(action) {const run=request.current;setBusy(true);setError('');try{const d=await articleAudioRequest(action,doc.key,voice,true);if(run!==request.current)return;setStatus(d);window.dispatchEvent(new Event('lateral-narration-updated'));}catch(e){if(run===request.current)setError(e.message);}finally{if(run===request.current)setBusy(false);}}
+  const working=status&&['queued','generating'].includes(status.state),ready=status?.state==='ready',mini={fontSize:11.5,color:C.textMute,lineHeight:1.5},button={fontSize:12,fontWeight:700,padding:'7px 10px',border:`1px solid ${C.border}`,borderRadius:7,background:C.surface,color:C.accent,cursor:'pointer'};
+  return <section aria-label="Listen to saved article" style={{padding:14,border:`1px solid ${C.border}`,borderRadius:10,marginBottom:16,background:C.bg}}>
+    <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginBottom:8}}><strong style={{fontSize:13,color:C.text}}>Listen to this article</strong><label style={{...mini,marginLeft:'auto'}}>Voice <select aria-label="Narration voice" value={voice} disabled={working||busy} onChange={e=>setVoice(e.target.value)} style={{...button,padding:5}}><option value="HermesVoice">Hermes</option><option value="SamaraNew">Samara</option></select></label></div>
+    {ready ? <><audio ref={player} aria-label="Saved article narration" controls preload="metadata" src={status.audioURL} style={{width:'100%',maxWidth:'100%',height:40}} onPlay={()=>{cancelTtsPlayback();document.querySelectorAll('audio').forEach(a=>{if(a!==player.current)a.pause();});}}/><div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',marginTop:8}}><label style={mini}>Speed <select aria-label="Narration playback speed" defaultValue="1" onChange={e=>{if(player.current)player.current.playbackRate=Number(e.target.value);}} style={{...button,padding:4}}>{[.75,1,1.25,1.5,1.75,2].map(n=><option key={n} value={n}>{n}×</option>)}</select></label><a href={status.audioURL} download={'lateral-'+doc.key+'.wav'} style={{fontSize:12,color:C.accent}}>Download audio ↓</a><button style={button} onClick={()=>{player.current?.pause();window.dispatchEvent(new CustomEvent('lateral-play-audio',{detail:{audioUrl:status.audioURL,title:doc.title,showName:'Library · '+(voice==='HermesVoice'?'Hermes':'Samara')}}));}}>Keep listening while browsing ↗</button></div><p style={{...mini,margin:'8px 0 0'}}>Saved narration · {Math.ceil(status.duration/60)} min · generated locally</p></> : <><div style={{display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}><button style={button} disabled={busy||working||!status} onClick={()=>command('generate')}>{busy?'Connecting…':working?status.state==='queued'?'Queued for Hermes…':'Creating narration…':['error','interrupted','cancelled'].includes(status?.state)?'Retry narration':'Listen with '+(voice==='HermesVoice'?'Hermes':'Samara')}</button>{working&&<button style={button} disabled={busy} onClick={()=>command('cancel')}>Cancel generation</button>}</div>{working&&<div role="status" style={{marginTop:8}}><progress aria-label="Narration progress" value={status.done} max={status.total||1} style={{width:'100%'}}/><p style={mini}>{status.done} of {status.total} sections ready. First-time generation can take a while on CPU; you can leave this article and return.</p></div>}<p style={{...mini,margin:'8px 0 0'}}>Generate from this saved copy on your local voice service. Finished audio is kept for replay.</p></>}
+    {(error||status?.error)&&<p role="status" style={{...mini,color:'#b45309',marginTop:8}}>{error||status.error}</p>}
+    {voices?.available===false&&<p style={{...mini,marginTop:8}}>Chatterbox is currently unavailable. Try browser read-aloud below.</p>}
+    <div style={{marginTop:10,display:'flex',gap:9,alignItems:'center',flexWrap:'wrap'}}><TTSButton text={[doc.title,doc.text].join('. ')} settings={{ttsVoice:browserVoice}} label="Browser read-aloud" title="Use your browser’s available voice"/>{browserVoices.length>0&&<select aria-label="Browser reading voice" value={browserVoice} onChange={e=>setBrowserVoice(e.target.value)} style={{...button,maxWidth:'100%',fontSize:11,padding:4}}><option value="">Device default voice</option>{browserVoices.map(v=><option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>)}</select>}<span style={mini}>Browser voice availability varies by device.</span></div>
+  </section>;
+}
+
+
 function ArticleReader({ archiveKey, onClose, onDeleted, inline, extra }) {
   const [doc, setDoc] = useState(null);
   const [err, setErr] = useState('');
@@ -6062,6 +6097,7 @@ function ArticleReader({ archiveKey, onClose, onDeleted, inline, extra }) {
             <br/>
             Saved {new Date(doc.savedAt).toLocaleString()}{doc.method === 'tavily' ? ' (via Tavily Extract)' : ''}, kept only on this computer.
           </div>
+          <ArticleAudio key={doc.key} doc={doc}/>
           {extra && extra(doc, () => setVer(v => v + 1))}
           <div style={{display:'flex',gap:10,marginBottom:14,alignItems:'center'}}>
             <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{fontSize:12,fontWeight:700,color:C.accent}}>Open original ↗</a>
@@ -14445,7 +14481,8 @@ function ForYou({ stories, onSelectStory, onOpenCalendar, onPlayAudio }) {
     const tick = async () => { const x = await load(); if (!alive.current) return; if (x && x.pending && tries++ < 8) timer = setTimeout(tick, 15000); };
     tick();
     const every = setInterval(load, 5 * 60000);
-    return () => { alive.current = false; clearTimeout(timer); clearInterval(every); };
+    window.addEventListener('lateral-narration-updated',load);
+    return () => { alive.current = false; clearTimeout(timer); clearInterval(every); window.removeEventListener('lateral-narration-updated',load); };
   }, []);
   const toggle = () => setOpen(o => { const n = !o; try { localStorage.setItem(FORYOU_STORE, n ? 'open' : 'closed'); } catch { /* not saved */ } return n; });
   const storyOk = id => !!id && (stories || []).some(s => s.id === id);
@@ -14476,6 +14513,20 @@ function ForYou({ stories, onSelectStory, onOpenCalendar, onPlayAudio }) {
   const picks = ((d && d.podcasts) || []).filter(p => !gone[p.key]);
   const cards = [];
   if (d) {
+    if ((d.library || []).length) cards.push(
+      <div key="library" data-testid="foryou-library" style={card('#b86b4a')}>
+        {head('#b86b4a', 'From your Library', d.library.length)}
+        {d.library.map(a => <div key={a.key} style={{padding:'7px 0',borderTop:`1px solid ${C.borderLight}`}}>
+          <div style={{fontSize:12.5,fontWeight:700,color:C.text,lineHeight:1.35}}>{a.title}</div>
+          <div style={small}>{a.site || 'Saved article'} · {Math.max(1,Math.ceil((a.words||0)/220))} min read{a.audio?.state==='ready'?' · Hermes audio ready':''}</div>
+          <div style={{...small,fontStyle:'italic'}}>{a.reason}</div>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:5}}>
+            <button style={link} onClick={()=>window.dispatchEvent(new CustomEvent('lateral-open-library',{detail:{key:a.key}}))}>Read →</button>
+            {a.audio?.state==='ready'&&onPlayAudio ? <button style={link} onClick={()=>onPlayAudio({audioUrl:a.audio.audioURL,title:a.title,showName:'Library · Hermes'})}>▶ Listen with Hermes</button> : <button style={link} onClick={()=>window.dispatchEvent(new CustomEvent('lateral-open-library',{detail:{key:a.key}}))}>{['queued','generating'].includes(a.audio?.state)?'Narration in progress…':'Listen / create audio →'}</button>}
+          </div>
+        </div>)}
+      </div>
+    );
     if (d.moved.length) cards.push(
       <div key="moved" style={card('#d97706')}>
         {head('#d97706', 'Moved', d.moved.length)}
@@ -15069,7 +15120,7 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                         <div style={{width:8, height:8, borderRadius:'50%', background:stCfg.dot, flexShrink:0}}/>
                         <span style={{fontFamily:'Playfair Display, Georgia, serif', fontSize:15, fontWeight:600, color:C.textMid, letterSpacing:'0.02em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{s.title}</span>
                       </div>
-                      <div style={HOME_GRID_4_COL}>
+                      <div className="home-article-grid" style={HOME_GRID_4_COL}>
                         <GroupedCards articles={items} render={(a, also, i) => (
                           <ArticleCard key={a.url || i} article={a} also={also} onAddEp={onAddEpisode ? (art) => onAddEpisode(art, s.id) : undefined}/>
                         )}/>
@@ -15106,7 +15157,7 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                     <span style={{...HOME_CHEVRON, marginLeft:'auto'}}>{discOpen[cat.key] ? '▾' : '▸'}</span>
                   </SectionToggleButton>
                   {discOpen[cat.key] && (
-                    <div style={HOME_GRID_4_COL}>
+                    <div className="home-article-grid" style={HOME_GRID_4_COL}>
                       <GroupedCards articles={disc[cat.key]} render={(a, also, i) => (
                         <ArticleCard key={a.url || i} article={a} also={also} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
                       )}/>
@@ -15123,7 +15174,7 @@ function HomePanel({ stories, settings, serverReady, onStartStory, onAddEpisode,
                   <span style={{...HOME_CHEVRON, marginLeft:'auto'}}>{discOpen.local ? '▾' : '▸'}</span>
                 </SectionToggleButton>
                 {discOpen.local && (
-                  <div style={HOME_GRID_4_COL}>
+                  <div className="home-article-grid" style={HOME_GRID_4_COL}>
                     <GroupedCards articles={disc.local} render={(a, also, i) => (
                       <ArticleCard key={a.url || i} article={a} also={also} onTrack={onStartStory ? () => onStartStory(a) : undefined}/>
                     )}/>
@@ -15638,6 +15689,7 @@ function TTSButton({ text, settings, label = 'Read', title = 'Read aloud', style
     if (!canPlay) return;
     if (active) { cancelTtsPlayback(); return; }
     cancelTtsPlayback();
+    document.querySelectorAll('audio').forEach(a=>a.pause());
     const chunks = splitSpeechChunks(speechText);
     if (!chunks.length) return;
     const voiceId = String(settings?.ttsVoice || '').trim();
@@ -15972,11 +16024,12 @@ function ChatDrawer({ story, stories, leftPanelOpen, rightPanelWidth = 308, onAd
 // ─── Floating Audio Player ────────────────────────────────────────────────────
 function FloatingAudioPlayer({ player, onClose }) {
   const [minimized, setMinimized] = useState(false);
+  const audioRef = useRef(null);
   if (!player) return null;
   return (
     <div style={{
       position:'fixed', bottom:20, right:20, zIndex:4000,
-      width: minimized ? 'auto' : 320,
+      width: minimized ? 'auto' : 'min(320px, calc(100vw - 40px))',
       background:C.surface, border:`1px solid ${C.border}`,
       borderRadius:12, boxShadow:'0 8px 32px rgba(0,0,0,0.22)',
       padding: minimized ? '8px 12px' : 12,
@@ -16008,7 +16061,7 @@ function FloatingAudioPlayer({ player, onClose }) {
         </button>
         <button
           onClick={onClose}
-          title="Close player"
+          title="Close player" aria-label="Close player"
           style={{border:'none', background:'none', fontSize:17, color:C.textMute, cursor:'pointer', padding:'0 3px', flexShrink:0}}>
           ×
         </button>
@@ -16018,8 +16071,11 @@ function FloatingAudioPlayer({ player, onClose }) {
         controls
         autoPlay
         style={{width:'100%', height:36, display: minimized ? 'none' : 'block'}}
+        ref={audioRef} aria-label="Floating audio player"
+        onPlay={()=>{cancelTtsPlayback();document.querySelectorAll('audio').forEach(a=>{if(a!==audioRef.current)a.pause();});}}
         src={player.audioUrl}
       />
+      {!minimized && <label style={{fontSize:11,color:C.textMute}}>Speed <select key={player.audioUrl} aria-label="Player playback speed" defaultValue="1" onChange={e=>{if(audioRef.current)audioRef.current.playbackRate=Number(e.target.value);}}>{[.75,1,1.25,1.5,1.75,2].map(n=><option key={n} value={n}>{n}×</option>)}</select></label>}
     </div>
   );
 }
@@ -16117,6 +16173,7 @@ function App() {
   const [cacheVer,setCacheVer]=useState(0); // bumped after server cache hydration → triggers re-render
   const [serverReady,setServerReady]=useState(false);
   const [floatingPlayer, setFloatingPlayer] = useState(null);
+  useEffect(()=>{const play=e=>{cancelTtsPlayback();document.querySelectorAll('audio').forEach(a=>a.pause());setFloatingPlayer(e.detail);};window.addEventListener('lateral-play-audio',play);return()=>window.removeEventListener('lateral-play-audio',play);},[]);
   const settingsSyncReadyRef = useRef(false);
   const [theme, setTheme] = useState(() => { try { return themeById(localStorage.getItem('lateral-theme')).id; } catch { return 'beige'; } });
   const [tavilyUsage, setTavilyUsage] = useState(null);
@@ -16316,7 +16373,7 @@ function App() {
 
   // "Saved copy" buttons elsewhere (e.g. on an episode) ask the Library to open one article.
   useEffect(() => {
-    const h = (e) => { openLibrary(); setLibKey(e.detail && e.detail.key ? e.detail.key : null); };
+    const h = (e) => { openLibrary(); const key=e.detail && e.detail.key ? e.detail.key : null; setLibKey(key); if(key && isMobile) setLeftPanelOpen(false); };
     window.addEventListener('lateral-open-library', h);
     return () => window.removeEventListener('lateral-open-library', h);
   });
@@ -17023,61 +17080,10 @@ function App() {
 
 // Register service worker for PWA support
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js?v=20261008-audio3').catch(() => {});
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

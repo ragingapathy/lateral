@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lateral-v1';
+const CACHE_NAME = 'lateral-audio-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,10 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  if (request.mode === 'navigate' || url.pathname.endsWith('/index.html')) {
+    e.respondWith(fetch(request,{cache:'no-cache'}).then(response=>{if(response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy));}return response;}).catch(()=>caches.match(request).then(c=>c||caches.match('/'))));
+    return;
+  }
   // Everything else: try cache first, then network
   e.respondWith(
     caches.match(request).then(cached => {

@@ -560,3 +560,7 @@ witnesses (Polymarket and Kalshi) on predictions.
 Lateral is **source-available** under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
 You may use, modify and share it for personal, educational, research and other noncommercial purposes. Commercial use requires
 separate permission from the copyright holder. See `LICENSE`.
+
+## Saved-article listening and Library picks
+
+The Library can generate and retain local Hermes/Samara narration, with progress, retry, cancellation, seeking, speed controls, download, and floating playback. Browser read-aloud offers a device voice picker. For You suggests up to three saved articles and highlights ready Hermes audio. See [AUDIO-NOTES.md](AUDIO-NOTES.md) for service configuration, storage, limits, and checks. Run node tools/article-audio-check.cjs for isolated backend checks.

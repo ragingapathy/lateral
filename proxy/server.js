@@ -4421,6 +4421,9 @@ const server = http.createServer(async (req, res) => {
   const isAgentsConfig = pathname === '/agents/config' || pathname === '/api/lateral/agents/config';
   const isAgentsTest   = pathname === '/agents/test'   || pathname === '/api/lateral/agents/test';
   const opsCtx = { dataDir: DATA_DIR, send, getTavilyKey: () => resolveLlmSecrets().tavilyApiKey };
+  if (/^(\/api\/lateral)?\/article-audio\//.test(pathname)) {
+    if (await require('./article-audio').route(req, reqUrl, res, send) !== false) return;
+  }
   if (pathname.startsWith('/archive/') || pathname.startsWith('/api/lateral/archive/')) {
     if (await archive.route(req, reqUrl, res, send) !== false) return;
   }

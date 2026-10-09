@@ -148,11 +148,12 @@ async function build() {
   const hiddenFor = id => (ctx.hidden ? ctx.hidden(id) : (require('./podcasts')._internals.index.hidden[id] || {})) || {};
   const view = {
     asOf: new Date(now).toISOString(), today,
+    library: require('./article-audio').pickLibrary(require('./archive').list({limit:500}),stories(),now),
     moved: movedFrom(events, now), coming: comingFrom(cal, events, now, today), civic: civicFrom(events, now),
     podcasts: state.picks.filter(p => !(hiddenFor(p.storyId) || {})[p.key]), podcastsAt: state.at ? new Date(state.at).toISOString() : '',
     pending: running || (stale && !ctx.noBackground), podcastError: state.error || '',
   };
-  view.empty = !view.moved.length && !view.coming.length && !view.civic.length && !view.podcasts.length;
+  view.empty = !view.moved.length && !view.coming.length && !view.civic.length && !view.podcasts.length && !view.library.length;
   return view;
 }
 

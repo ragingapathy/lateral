@@ -463,8 +463,11 @@ function list({ storyId = '', limit = 100 } = {}) {
     .slice(0, limit);
 }
 
+function get(key) { return typeof key === "string" && /^[a-f0-9]{16}$/.test(key) && index.items[key] ? loadDoc(key) : null; }
+
 function remove(key) {
   if (!index.items[key]) return false;
+  require("./article-audio").forget(key);
   delete index.items[key];
   for (const [a, k] of Object.entries(index.alias)) if (k === key) delete index.alias[a];
   docCache.delete(key);
@@ -537,4 +540,4 @@ async function route(req, reqUrl, res, send) {
   return send(res, 404, { error: 'Unknown archive route.' });
 }
 
-module.exports = { route, enqueue, enqueueAuto, saveNow, search, list, stats, backfill, extractArticle, cleanLoose };
+module.exports = { get, route, enqueue, enqueueAuto, saveNow, search, list, stats, backfill, extractArticle, cleanLoose };
